@@ -109,23 +109,7 @@ describe.sequential("Request handler", () => {
         expect(result).toMatchSnapshot();
     });
 
-    let producerId = BigInt(Math.floor(Math.random() * 1000));
-
-    it("should fail to init producer id on first try", async () => {
-        try {
-            await cluster.sendRequest(API.INIT_PRODUCER_ID, {
-                transactionalId: null,
-                transactionTimeoutMs: 0,
-                producerId,
-                producerEpoch: 0,
-            });
-            expect(false, "Should throw an error").toBe(true);
-        } catch (error) {
-            expect(error).toMatchInlineSnapshot(
-                `[AssertionError: Should throw an error: expected false to be true // Object.is equality]`,
-            );
-        }
-    });
+    let producerId = 9n;
 
     it("should init producer id", async () => {
         const result = await cluster.sendRequest(API.INIT_PRODUCER_ID, {
@@ -158,7 +142,7 @@ describe.sequential("Request handler", () => {
                             lastOffsetDelta: 0,
                             maxTimestamp: BigInt(now),
                             producerEpoch: 0,
-                            producerId: 9n,
+                            producerId,
                             records: [
                                 {
                                     attributes: 0,
