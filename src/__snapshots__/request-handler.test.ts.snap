@@ -1,0 +1,1687 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Request handler > should commit offsets 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "throttleTimeMs": 0,
+  "topics": [
+    {
+      "_tag": undefined,
+      "name": "kafka-ts-test-topic",
+      "partitions": [
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "partitionIndex": 0,
+        },
+      ],
+    },
+  ],
+}
+`;
+
+exports[`Request handler > should create topics 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "throttleTimeMs": 0,
+  "topics": [
+    {
+      "_tag": undefined,
+      "configs": [
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "cleanup.policy",
+          "readOnly": false,
+          "value": "delete",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "compression.type",
+          "readOnly": false,
+          "value": "producer",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "delete.retention.ms",
+          "readOnly": false,
+          "value": "86400000",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "file.delete.delay.ms",
+          "readOnly": false,
+          "value": "60000",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "flush.messages",
+          "readOnly": false,
+          "value": "9223372036854775807",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "flush.ms",
+          "readOnly": false,
+          "value": "9223372036854775807",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "follower.replication.throttled.replicas",
+          "readOnly": false,
+          "value": "",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "index.interval.bytes",
+          "readOnly": false,
+          "value": "4096",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "leader.replication.throttled.replicas",
+          "readOnly": false,
+          "value": "",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "local.retention.bytes",
+          "readOnly": false,
+          "value": "-2",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "local.retention.ms",
+          "readOnly": false,
+          "value": "-2",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "max.compaction.lag.ms",
+          "readOnly": false,
+          "value": "9223372036854775807",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "max.message.bytes",
+          "readOnly": false,
+          "value": "1048588",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "message.downconversion.enable",
+          "readOnly": false,
+          "value": "true",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "message.format.version",
+          "readOnly": false,
+          "value": "3.0-IV1",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "message.timestamp.after.max.ms",
+          "readOnly": false,
+          "value": "9223372036854775807",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "message.timestamp.before.max.ms",
+          "readOnly": false,
+          "value": "9223372036854775807",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "message.timestamp.difference.max.ms",
+          "readOnly": false,
+          "value": "9223372036854775807",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "message.timestamp.type",
+          "readOnly": false,
+          "value": "CreateTime",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "min.cleanable.dirty.ratio",
+          "readOnly": false,
+          "value": "0.5",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "min.compaction.lag.ms",
+          "readOnly": false,
+          "value": "0",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "min.insync.replicas",
+          "readOnly": false,
+          "value": "1",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "preallocate",
+          "readOnly": false,
+          "value": "false",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "remote.storage.enable",
+          "readOnly": false,
+          "value": "false",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "retention.bytes",
+          "readOnly": false,
+          "value": "-1",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "retention.ms",
+          "readOnly": false,
+          "value": "604800000",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "segment.bytes",
+          "readOnly": false,
+          "value": "1073741824",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "segment.index.bytes",
+          "readOnly": false,
+          "value": "10485760",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "segment.jitter.ms",
+          "readOnly": false,
+          "value": "0",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "segment.ms",
+          "readOnly": false,
+          "value": "604800000",
+        },
+        {
+          "_tag": undefined,
+          "configSource": 5,
+          "isSensitive": false,
+          "name": "unclean.leader.election.enable",
+          "readOnly": false,
+          "value": "false",
+        },
+      ],
+      "errorCode": 0,
+      "errorMessage": null,
+      "name": "kafka-ts-test-topic",
+      "numPartitions": 1,
+      "replicationFactor": 1,
+      "topicId": "Any<UUID>",
+    },
+  ],
+}
+`;
+
+exports[`Request handler > should delete topics 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "responses": [
+    {
+      "_tag": undefined,
+      "errorCode": 0,
+      "errorMessage": null,
+      "name": "kafka-ts-test-topic",
+      "topicId": "Any<UUID>",
+    },
+  ],
+  "throttleTimeMs": 0,
+}
+`;
+
+exports[`Request handler > should fail join group request with new memberId 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "errorCode": 79,
+  "generationId": -1,
+  "leader": "",
+  "memberId": "Any<UUID>",
+  "members": [],
+  "protocolName": null,
+  "protocolType": null,
+  "skipAssignment": false,
+  "throttleTimeMs": 0,
+}
+`;
+
+exports[`Request handler > should fetch messages 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "errorCode": 0,
+  "responses": [
+    {
+      "_tag": undefined,
+      "partitions": [
+        {
+          "_tag": undefined,
+          "abortedTransactions": [],
+          "errorCode": 0,
+          "highWatermark": 1n,
+          "lastStableOffset": 1n,
+          "logStartOffset": 0n,
+          "partitionIndex": 0,
+          "preferredReadReplica": -1,
+          "records": [
+            {
+              "attributes": 0,
+              "baseOffset": 0n,
+              "baseSequence": 0,
+              "baseTimestamp": 0n,
+              "batchLength": 94,
+              "crc": 0,
+              "lastOffsetDelta": 0,
+              "magic": 2,
+              "maxTimestamp": 0n,
+              "partitionLeaderEpoch": 0,
+              "producerEpoch": 0,
+              "producerId": 9n,
+              "records": [
+                {
+                  "attributes": 0,
+                  "headers": [
+                    {
+                      "key": "header-key",
+                      "value": "header-value",
+                    },
+                  ],
+                  "key": "key",
+                  "offsetDelta": 0,
+                  "timestampDelta": 0n,
+                  "value": "value",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      "topicId": "Any<UUID>",
+    },
+  ],
+  "sessionId": 0,
+  "throttleTimeMs": 0,
+}
+`;
+
+exports[`Request handler > should fetch offsets 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "groups": [
+    {
+      "_tag": undefined,
+      "errorCode": 0,
+      "groupId": "Any<String>",
+      "topics": [
+        {
+          "_tag": undefined,
+          "name": "kafka-ts-test-topic",
+          "partitions": [
+            {
+              "_tag": undefined,
+              "committedLeaderEpoch": 0,
+              "committedMetadata": "",
+              "committedOffset": 1n,
+              "errorCode": 0,
+              "partitionIndex": 0,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  "throttleTimeMs": 0,
+}
+`;
+
+exports[`Request handler > should find coordinator 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "coordinators": [
+    {
+      "_tag": undefined,
+      "errorCode": 0,
+      "errorMessage": "",
+      "host": "localhost",
+      "key": "Any<String>",
+      "nodeId": 1,
+      "port": 9093,
+    },
+  ],
+  "throttleTimeMs": 0,
+}
+`;
+
+exports[`Request handler > should heartbeat 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "errorCode": 0,
+  "throttleTimeMs": 0,
+}
+`;
+
+exports[`Request handler > should init producer id 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "errorCode": 0,
+  "producerEpoch": 0,
+  "producerId": 0n,
+  "throttleTimeMs": 0,
+}
+`;
+
+exports[`Request handler > should join group 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "errorCode": 0,
+  "generationId": 1,
+  "leader": "Any<UUID>",
+  "memberId": "Any<UUID>",
+  "members": [
+    {
+      "_tag": undefined,
+      "groupInstanceId": null,
+      "memberId": "Any<UUID>",
+      "metadata": {
+        "data": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          18,
+          107,
+          97,
+          102,
+          107,
+          97,
+          116,
+          115,
+          45,
+          116,
+          101,
+          115,
+          116,
+          45,
+          116,
+          111,
+          112,
+          105,
+          99,
+          0,
+          0,
+          0,
+          0,
+        ],
+        "type": "Buffer",
+      },
+    },
+  ],
+  "protocolName": "RoundRobinAssigner",
+  "protocolType": "consumer",
+  "skipAssignment": false,
+  "throttleTimeMs": 0,
+}
+`;
+
+exports[`Request handler > should leave group 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "errorCode": 0,
+  "members": [
+    {
+      "_tag": undefined,
+      "errorCode": 0,
+      "groupInstanceId": null,
+      "memberId": "Any<UUID>",
+    },
+  ],
+  "throttleTimeMs": 0,
+}
+`;
+
+exports[`Request handler > should produce messages 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "responses": [
+    {
+      "_tag": undefined,
+      "name": "kafka-ts-test-topic",
+      "partitionResponses": [
+        {
+          "_tag": undefined,
+          "baseOffset": 0n,
+          "errorCode": 0,
+          "errorMessage": null,
+          "index": 0,
+          "logAppendTime": -1n,
+          "logStartOffset": 0n,
+          "recordErrors": [],
+        },
+      ],
+    },
+  ],
+  "throttleTimeMs": 0,
+}
+`;
+
+exports[`Request handler > should request api versions 1`] = `
+{
+  "errorCode": 0,
+  "throttleTimeMs": 0,
+  "versions": [
+    {
+      "apiKey": 0,
+      "maxVersion": 10,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 1,
+      "maxVersion": 16,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 2,
+      "maxVersion": 8,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 3,
+      "maxVersion": 12,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 8,
+      "maxVersion": 9,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 9,
+      "maxVersion": 9,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 10,
+      "maxVersion": 4,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 11,
+      "maxVersion": 9,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 12,
+      "maxVersion": 4,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 13,
+      "maxVersion": 5,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 14,
+      "maxVersion": 5,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 15,
+      "maxVersion": 5,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 16,
+      "maxVersion": 4,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 17,
+      "maxVersion": 1,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 18,
+      "maxVersion": 3,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 19,
+      "maxVersion": 7,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 20,
+      "maxVersion": 6,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 21,
+      "maxVersion": 2,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 22,
+      "maxVersion": 4,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 23,
+      "maxVersion": 4,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 24,
+      "maxVersion": 4,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 25,
+      "maxVersion": 3,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 26,
+      "maxVersion": 3,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 27,
+      "maxVersion": 1,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 28,
+      "maxVersion": 3,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 29,
+      "maxVersion": 3,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 30,
+      "maxVersion": 3,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 31,
+      "maxVersion": 3,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 32,
+      "maxVersion": 4,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 33,
+      "maxVersion": 2,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 34,
+      "maxVersion": 2,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 35,
+      "maxVersion": 4,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 36,
+      "maxVersion": 2,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 37,
+      "maxVersion": 3,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 38,
+      "maxVersion": 3,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 39,
+      "maxVersion": 2,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 40,
+      "maxVersion": 2,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 41,
+      "maxVersion": 3,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 42,
+      "maxVersion": 2,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 43,
+      "maxVersion": 2,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 44,
+      "maxVersion": 1,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 45,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 46,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 47,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 48,
+      "maxVersion": 1,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 49,
+      "maxVersion": 1,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 50,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 51,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 55,
+      "maxVersion": 1,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 57,
+      "maxVersion": 1,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 60,
+      "maxVersion": 1,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 61,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 64,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 65,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 66,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 68,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+    {
+      "apiKey": 74,
+      "maxVersion": 0,
+      "minVersion": 0,
+    },
+  ],
+}
+`;
+
+exports[`Request handler > should request metadata for a topic 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "brokers": [
+    {
+      "_tag": undefined,
+      "host": "localhost",
+      "nodeId": 0,
+      "port": 9092,
+      "rack": null,
+    },
+    {
+      "_tag": undefined,
+      "host": "localhost",
+      "nodeId": 1,
+      "port": 9093,
+      "rack": null,
+    },
+    {
+      "_tag": undefined,
+      "host": "localhost",
+      "nodeId": 2,
+      "port": 9094,
+      "rack": null,
+    },
+  ],
+  "clusterId": "4L6g3nShT-eMCtK--X86sw",
+  "controllerId": 0,
+  "throttleTimeMs": 0,
+  "topics": [
+    {
+      "_tag": undefined,
+      "errorCode": 0,
+      "isInternal": false,
+      "name": "kafka-ts-test-topic",
+      "partitions": [
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 0,
+          "replicaNodes": [
+            0,
+          ],
+        },
+      ],
+      "topicAuthorizedOperations": -2147483648,
+      "topicId": "Any<UUID>",
+    },
+  ],
+}
+`;
+
+exports[`Request handler > should request metadata for all topics 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "brokers": [
+    {
+      "_tag": undefined,
+      "host": "localhost",
+      "nodeId": 0,
+      "port": 9092,
+      "rack": null,
+    },
+    {
+      "_tag": undefined,
+      "host": "localhost",
+      "nodeId": 1,
+      "port": 9093,
+      "rack": null,
+    },
+    {
+      "_tag": undefined,
+      "host": "localhost",
+      "nodeId": 2,
+      "port": 9094,
+      "rack": null,
+    },
+  ],
+  "clusterId": "4L6g3nShT-eMCtK--X86sw",
+  "controllerId": 0,
+  "throttleTimeMs": 0,
+  "topics": [
+    {
+      "_tag": undefined,
+      "errorCode": 0,
+      "isInternal": false,
+      "name": "kafka-ts-test-topic",
+      "partitions": [
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 0,
+          "replicaNodes": [
+            0,
+          ],
+        },
+      ],
+      "topicAuthorizedOperations": -2147483648,
+      "topicId": "Any<UUID>",
+    },
+    {
+      "_tag": undefined,
+      "errorCode": 0,
+      "isInternal": true,
+      "name": "__consumer_offsets",
+      "partitions": [
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 25,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 19,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 23,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 40,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 5,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 0,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 29,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 32,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 13,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 30,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 42,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 28,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 36,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 48,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 31,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 10,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 22,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 45,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 4,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 17,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 2,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 39,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 16,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 34,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 8,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 12,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 6,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 26,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 14,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 1,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 11,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 7,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 24,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 33,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 44,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 3,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 37,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 38,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 9,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 43,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 47,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 49,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 46,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 41,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 20,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 15,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 18,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 27,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 35,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 21,
+          "replicaNodes": [
+            0,
+          ],
+        },
+      ],
+      "topicAuthorizedOperations": -2147483648,
+      "topicId": "Any<UUID>",
+    },
+  ],
+}
+`;
+
+exports[`Request handler > should sync group 1`] = `
+{
+  "_tag": undefined,
+  "_tag2": undefined,
+  "assignments": "{"kafka-test-topic":[0]}",
+  "errorCode": 0,
+  "protocolName": "RoundRobinAssigner",
+  "protocolType": "consumer",
+  "throttleTimeMs": 0,
+}
+`;

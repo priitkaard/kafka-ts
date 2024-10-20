@@ -1,0 +1,21 @@
+{
+  "name": "kafka-ts",
+  "version": "0.0.1-beta",
+  "main": "dist/index.js",
+  "author": "Priit Käärd",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/priitkaard/kafka-ts.git"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest --testTimeout 60000 --bail 1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}
