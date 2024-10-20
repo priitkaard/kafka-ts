@@ -76,6 +76,7 @@ describe.sequential("Request handler", () => {
             includeTopicAuthorizedOperations: false,
         });
         result.controllerId = 0;
+        result.topics = result.topics.filter((topic) => topic.name !== "__consumer_offsets");
         result.topics.forEach((topic) => {
             topic.topicId = "Any<UUID>";
             topic.partitions.forEach((partition) => {
@@ -108,11 +109,29 @@ describe.sequential("Request handler", () => {
         expect(result).toMatchSnapshot();
     });
 
+    let producerId = BigInt(Math.floor(Math.random() * 1000));
+
+    it("should fail to init producer id on first try", async () => {
+        try {
+            await cluster.sendRequest(API.INIT_PRODUCER_ID, {
+                transactionalId: null,
+                transactionTimeoutMs: 0,
+                producerId,
+                producerEpoch: 0,
+            });
+            expect(false, "Should throw an error").toBe(true);
+        } catch (error) {
+            expect(error).toMatchInlineSnapshot(
+                `[AssertionError: Should throw an error: expected false to be true // Object.is equality]`,
+            );
+        }
+    });
+
     it("should init producer id", async () => {
         const result = await cluster.sendRequest(API.INIT_PRODUCER_ID, {
             transactionalId: null,
             transactionTimeoutMs: 0,
-            producerId: 0n,
+            producerId,
             producerEpoch: 0,
         });
         result.producerId = 0n;
