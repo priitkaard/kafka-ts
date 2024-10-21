@@ -16,8 +16,8 @@ npm install kafka-ts
 
 ```typescript
 export const kafka = createKafkaClient({
-    clientId: "my-app",
-    bootstrapServers: [{ host: "localhost", port: 9092 }],
+    clientId: 'my-app',
+    bootstrapServers: [{ host: 'localhost', port: 9092 }],
 });
 ```
 
@@ -26,7 +26,7 @@ export const kafka = createKafkaClient({
 ```typescript
 const consumer = await kafka.startConsumer({
     groupId: 'my-consumer-group'.
-    topics: ["my-topic"],
+    topics: ['my-topic'],
     onMessage: (message) => {
         console.log(message);
     },
@@ -36,36 +36,47 @@ const consumer = await kafka.startConsumer({
 #### Producing messages
 
 ```typescript
-export const producer = kafka.createProcucer();
+export const producer = kafka.createProducer();
 
-await producer.send([{ topic: "example-topic-f", partition: 0, key: null, value: line }]);
+await producer.send([{ topic: 'my-topic', partition: 0, key: 'key', value: 'value' }]);
 ```
 
 #### Low-level API
 
 ```typescript
 const cluster = kafka.createCluster();
-    await cluster.connect();
+await cluster.connect();
 
-    const { controllerId } = await cluster.sendRequest(API.METADATA, {
-        allowTopicAutoCreation: false,
-        includeTopicAuthorizedOperations: false,
-        topics: [],
-    });
+const { controllerId } = await cluster.sendRequest(API.METADATA, {
+    allowTopicAutoCreation: false,
+    includeTopicAuthorizedOperations: false,
+    topics: [],
+});
 
-    await cluster.sendRequestToNode(controllerId)(API.CREATE_TOPICS, {
-        validateOnly: false,
-        timeoutMs: 10_000,
-        topics: [
-            {
-                name: "my-topic",
-                numPartitions: 10,
-                replicationFactor: 3,
-                assignments: [],
-                configs: [],
-            },
-        ],
-    });
+await cluster.sendRequestToNode(controllerId)(API.CREATE_TOPICS, {
+    validateOnly: false,
+    timeoutMs: 10_000,
+    topics: [
+        {
+            name: 'my-topic',
+            numPartitions: 10,
+            replicationFactor: 3,
+            assignments: [],
+            configs: [],
+        },
+    ],
+});
+
+await cluster.disconnect();
+```
+
+#### Graceful shutdown
+
+```typescript
+process.once('SIGTERM', async () => {
+    await consumer.close(); // waits for the consumer to finish processing the last batch and disconnects
+    await producer.close();
+});
 ```
 
 See the [examples](./examples) for more detailed examples.
@@ -77,15 +88,14 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 
 ### New features compared to kafkajs
 
-* **Static consumer membership** - Rebalancing during rolling deployments causes delays. Using `groupInstanceId` in addition to `groupId` can avoid rebalancing and continue consuming partitions in the existing assignment.
-* **Consuming messages without consumer groups** - When you don't need the consumer to track the partition offsets, you can simply create a consumer without groupId and always either start consuming messages from the beginning or from the latest partition offset.
-* **Low-level API requests** - It's possible to communicate directly with the Kafka cluster using the kafka api protocol.
+-   **Static consumer membership** - Rebalancing during rolling deployments causes delays. Using `groupInstanceId` in addition to `groupId` can avoid rebalancing and continue consuming partitions in the existing assignment.
+-   **Consuming messages without consumer groups** - When you don't need the consumer to track the partition offsets, you can simply create a consumer without groupId and always either start consuming messages from the beginning or from the latest partition offset.
+-   **Low-level API requests** - It's possible to communicate directly with the Kafka cluster using the kafka api protocol.
 
 ## Backlog
 
 Minimal set of features required before a stable release:
 
-- Consumer concurrency control (Currently each relevant broker is polled in sequence)
-- Partitioner (Currently have to specify the partition on producer.send())
-- API versioning (Currently only tested against Kafka 3.7+)
-- SASL SCRAM support (+ pluggable authentication providers)
+-   Partitioner (Currently have to specify the partition on producer.send())
+-   API versioning (Currently only tested against Kafka 3.7+)
+-   SASL SCRAM support (+ pluggable authentication providers)

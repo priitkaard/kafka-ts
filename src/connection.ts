@@ -1,12 +1,14 @@
-import assert from "assert";
-import net, { isIP, Socket, TcpSocketConnectOpts } from "net";
-import tls, { TLSSocketOptions } from "tls";
-import { getApiName } from "./api";
-import { Api } from "./utils/api";
-import { Decoder } from "./utils/decoder";
-import { Encoder } from "./utils/encoder";
-import { ConnectionError } from "./utils/error";
-import { trace } from "./utils/tracer";
+import assert from 'assert';
+import net, { isIP, Socket, TcpSocketConnectOpts } from 'net';
+import tls, { TLSSocketOptions } from 'tls';
+import { getApiName } from './api';
+import { Api } from './utils/api';
+import { Decoder } from './utils/decoder';
+import { Encoder } from './utils/encoder';
+import { ConnectionError } from './utils/error';
+import { createTracer } from './utils/tracer';
+
+const trace = createTracer('Connection');
 
 export type ConnectionOptions = {
     clientId: string | null;
@@ -44,14 +46,14 @@ export class Connection {
                       resolve,
                   )
                 : net.connect(connection, resolve);
-            this.socket.once("error", reject);
+            this.socket.once('error', reject);
         });
-        this.socket.removeAllListeners("error");
+        this.socket.removeAllListeners('error');
 
-        this.socket.on("data", (data) => this.handleData(data));
-        this.socket.once("close", async () => {
+        this.socket.on('data', (data) => this.handleData(data));
+        this.socket.once('close', async () => {
             Object.values(this.queue).forEach(({ reject }) => {
-                reject(new ConnectionError("Socket closed unexpectedly"));
+                reject(new ConnectionError('Socket closed unexpectedly'));
             });
             this.queue = {};
         });
@@ -100,7 +102,7 @@ export class Connection {
 
     private write(buffer: Buffer) {
         return new Promise<void>((resolve, reject) => {
-            const { stack } = new Error("Write error");
+            const { stack } = new Error('Write error');
             this.socket.write(buffer, (error) => {
                 if (error) {
                     const err = new ConnectionError(error.message);

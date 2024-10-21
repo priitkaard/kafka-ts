@@ -1,9 +1,9 @@
-import { TcpSocketConnectOpts } from "net";
-import { TLSSocketOptions } from "tls";
-import { API } from "./api";
-import { Broker, SASLOptions } from "./broker";
-import { SendRequest } from "./connection";
-import { ConnectionError, KafkaTSError } from "./utils/error";
+import { TcpSocketConnectOpts } from 'net';
+import { TLSSocketOptions } from 'tls';
+import { API } from './api';
+import { Broker, SASLOptions } from './broker';
+import { SendRequest } from './connection';
+import { ConnectionError, KafkaTSError } from './utils/error';
 
 type ClusterOptions = {
     clientId: string | null;
@@ -82,6 +82,6 @@ export class Cluster {
                 console.warn(`Failed to connect to seed broker ${options.host}:${options.port}`, error);
             }
         }
-        throw new KafkaTSError("No seed brokers found");
+        throw new KafkaTSError('No seed brokers found');
     }
 }

@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { distributeAssignmentsToNodesBalanced, distributeAssignmentsToNodesOptimized } from "./assignments-to-replicas";
+import { describe, expect, it } from 'vitest';
+import { distributeAssignmentsToNodesBalanced, distributeAssignmentsToNodesOptimized } from './assignments-to-replicas';
 
-describe("Distribute assignments to replica ids", () => {
-    describe("distributeAssignmentsToNodesBalanced", () => {
-        it("smoke", () => {
+describe('Distribute assignments to replica ids', () => {
+    describe('distributeAssignmentsToNodesBalanced', () => {
+        it('smoke', () => {
             const result = distributeAssignmentsToNodesBalanced({ topic: [0, 1] }, { topic: { 0: [0, 1], 1: [1, 2] } });
             expect(result).toMatchInlineSnapshot(`
               {
@@ -22,8 +22,8 @@ describe("Distribute assignments to replica ids", () => {
         });
     });
 
-    describe("distributeAssignmentsToNodesOptimized", () => {
-        it("smoke", () => {
+    describe('distributeAssignmentsToNodesOptimized', () => {
+        it('smoke', () => {
             const result = distributeAssignmentsToNodesOptimized(
                 { topic: [0, 1] },
                 { topic: { 0: [0, 1], 1: [1, 2] } },

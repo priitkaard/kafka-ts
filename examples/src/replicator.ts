@@ -1,7 +1,7 @@
-import { kafka } from "./client";
+import { kafka } from './client';
 
 (async () => {
-    const topic = "example-topic";
+    const topic = 'example-topic';
 
     const producer = kafka.createProducer({ allowTopicAutoCreation: true });
     const consumer = await kafka.startConsumer({
@@ -10,7 +10,7 @@ import { kafka } from "./client";
             await producer.send(
                 messages.map((message) => ({
                     ...message,
-                    headers: { "X-Replicated": "true" },
+                    headers: { 'X-Replicated': 'true' },
                     topic: `${message.topic}-replicated`,
                     offset: 0n,
                 })),
@@ -18,7 +18,7 @@ import { kafka } from "./client";
             console.log(`Replicated ${messages.length} messages`);
         },
     });
-    process.on("SIGINT", async () => {
+    process.on('SIGINT', async () => {
         await consumer.close();
         await producer.close();
     });

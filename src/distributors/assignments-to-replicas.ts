@@ -50,7 +50,7 @@ export const distributeAssignmentsToNodesOptimized = (
         }
 
         result[parseInt(replicaId)] = partitions.reduce((acc, partition) => {
-            const [topicName, partitionId] = partition.split(":");
+            const [topicName, partitionId] = partition.split(':');
             acc[topicName] ??= [];
             acc[topicName].push(parseInt(partitionId));
             return acc;

@@ -1,5 +1,5 @@
-import { createApi } from "../utils/api.js";
-import { KafkaTSApiError } from "../utils/error.js";
+import { createApi } from '../utils/api.js';
+import { KafkaTSApiError } from '../utils/error.js';
 
 export const API_VERSIONS = createApi({
     apiKey: 18,

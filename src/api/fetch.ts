@@ -1,6 +1,6 @@
-import { createApi } from "../utils/api";
-import { Decoder } from "../utils/decoder";
-import { KafkaTSApiError } from "../utils/error";
+import { createApi } from '../utils/api';
+import { Decoder } from '../utils/decoder';
+import { KafkaTSApiError } from '../utils/error';
 
 export const enum IsolationLevel {
     READ_UNCOMMITTED = 0,

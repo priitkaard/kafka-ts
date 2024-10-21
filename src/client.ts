@@ -1,9 +1,9 @@
-import { TcpSocketConnectOpts } from "net";
-import { TLSSocketOptions } from "tls";
-import { SASLOptions } from "./broker";
-import { Cluster } from "./cluster";
-import { Consumer, ConsumerOptions } from "./consumer/consumer";
-import { Producer, ProducerOptions } from "./producer/producer";
+import { TcpSocketConnectOpts } from 'net';
+import { TLSSocketOptions } from 'tls';
+import { SASLOptions } from './broker';
+import { Cluster } from './cluster';
+import { Consumer, ConsumerOptions } from './consumer/consumer';
+import { Producer, ProducerOptions } from './producer/producer';
 
 type ClientOptions = {
     clientId?: string | null;

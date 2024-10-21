@@ -1,17 +1,18 @@
-import { kafka } from "./client";
+import { kafka } from './client';
 
 (async () => {
     const consumer = await kafka.startConsumer({
-        groupId: "example-group",
-        groupInstanceId: "example-group-instance",
-        topics: ["example-topic-f"],
-        allowTopicAutoCreation: true,
-        onMessage: (message) => {
-            console.log(message);
+        groupId: 'example-group',
+        groupInstanceId: 'example-group-instance',
+        topics: ['my-topic'],
+        onBatch: (batch) => {
+            console.log(batch);
         },
+        granularity: 'broker',
+        concurrency: 10,
     });
 
-    process.on("SIGINT", async () => {
+    process.on('SIGINT', async () => {
         await consumer.close();
     });
 })();

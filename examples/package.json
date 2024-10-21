@@ -1,14 +1,14 @@
 {
-  "name": "examples",
-  "version": "1.0.0",
-  "description": "",
-  "main": "dist/replicator.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "dependencies": {
-    "kafka-ts": "file:../"
-  },
-  "author": "",
-  "license": "ISC"
+    "name": "examples",
+    "version": "1.0.0",
+    "description": "",
+    "main": "dist/replicator.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "dependencies": {
+        "kafka-ts": "file:../"
+    },
+    "author": "",
+    "license": "ISC"
 }

@@ -1,21 +1,21 @@
-import { Api } from "../utils/api";
-import { API_VERSIONS } from "./api-versions";
-import { CREATE_TOPICS } from "./create-topics";
-import { DELETE_TOPICS } from "./delete-topics";
-import { FETCH } from "./fetch";
-import { FIND_COORDINATOR } from "./find-coordinator";
-import { HEARTBEAT } from "./heartbeat";
-import { INIT_PRODUCER_ID } from "./init-producer-id";
-import { JOIN_GROUP } from "./join-group";
-import { LEAVE_GROUP } from "./leave-group";
-import { LIST_OFFSETS } from "./list-offsets";
-import { METADATA } from "./metadata";
-import { OFFSET_COMMIT } from "./offset-commit";
-import { OFFSET_FETCH } from "./offset-fetch";
-import { PRODUCE } from "./produce";
-import { SASL_AUTHENTICATE } from "./sasl-authenticate";
-import { SASL_HANDSHAKE } from "./sasl-handshake";
-import { SYNC_GROUP } from "./sync-group";
+import { Api } from '../utils/api';
+import { API_VERSIONS } from './api-versions';
+import { CREATE_TOPICS } from './create-topics';
+import { DELETE_TOPICS } from './delete-topics';
+import { FETCH } from './fetch';
+import { FIND_COORDINATOR } from './find-coordinator';
+import { HEARTBEAT } from './heartbeat';
+import { INIT_PRODUCER_ID } from './init-producer-id';
+import { JOIN_GROUP } from './join-group';
+import { LEAVE_GROUP } from './leave-group';
+import { LIST_OFFSETS } from './list-offsets';
+import { METADATA } from './metadata';
+import { OFFSET_COMMIT } from './offset-commit';
+import { OFFSET_FETCH } from './offset-fetch';
+import { PRODUCE } from './produce';
+import { SASL_AUTHENTICATE } from './sasl-authenticate';
+import { SASL_HANDSHAKE } from './sasl-handshake';
+import { SYNC_GROUP } from './sync-group';
 
 export const API = {
     API_VERSIONS,

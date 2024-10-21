@@ -1,7 +1,7 @@
-import { API, API_ERROR } from "./api";
-import { Cluster } from "./cluster";
-import { delay } from "./utils/delay";
-import { KafkaTSApiError } from "./utils/error";
+import { API, API_ERROR } from './api';
+import { Cluster } from './cluster';
+import { delay } from './utils/delay';
+import { KafkaTSApiError } from './utils/error';
 
 type MetadataOptions = {
     cluster: Cluster;

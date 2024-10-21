@@ -1,10 +1,10 @@
-import { API, API_ERROR } from "../api";
-import { KEY_TYPE } from "../api/find-coordinator";
-import { Assignment, MemberAssignment } from "../api/sync-group";
-import { Cluster } from "../cluster";
-import { KafkaTSApiError, KafkaTSError } from "../utils/error";
-import { ConsumerMetadata } from "./consumer-metadata";
-import { OffsetManager } from "./offset-manager";
+import { API, API_ERROR } from '../api';
+import { KEY_TYPE } from '../api/find-coordinator';
+import { Assignment, MemberAssignment } from '../api/sync-group';
+import { Cluster } from '../cluster';
+import { KafkaTSApiError, KafkaTSError } from '../utils/error';
+import { ConsumerMetadata } from './consumer-metadata';
+import { OffsetManager } from './offset-manager';
 
 type ConsumerGroupOptions = {
     cluster: Cluster;
@@ -19,9 +19,9 @@ type ConsumerGroupOptions = {
 
 export class ConsumerGroup {
     private coordinatorId = -1;
-    private memberId = "";
+    private memberId = '';
     private generationId = -1;
-    private leaderId = "";
+    private leaderId = '';
     private memberIds: string[] = [];
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private heartbeatError: KafkaTSError | null = null;
@@ -76,8 +76,8 @@ export class ConsumerGroup {
                 memberId: this.memberId,
                 sessionTimeoutMs,
                 rebalanceTimeoutMs,
-                protocolType: "consumer",
-                protocols: [{ name: "RoundRobinAssigner", metadata: { version: 0, topics } }],
+                protocolType: 'consumer',
+                protocols: [{ name: 'RoundRobinAssigner', metadata: { version: 0, topics } }],
                 reason: null,
             });
             this.memberId = response.memberId;
@@ -118,11 +118,11 @@ export class ConsumerGroup {
             groupInstanceId,
             memberId: this.memberId,
             generationId: this.generationId,
-            protocolType: "consumer",
-            protocolName: "RoundRobinAssigner",
+            protocolType: 'consumer',
+            protocolName: 'RoundRobinAssigner',
             assignments,
         });
-        metadata.setAssignment(JSON.parse(response.assignments || "{}") as Assignment);
+        metadata.setAssignment(JSON.parse(response.assignments || '{}') as Assignment);
     }
 
     private async offsetFetch() {

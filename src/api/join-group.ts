@@ -1,6 +1,6 @@
-import { createApi } from "../utils/api";
-import { Encoder } from "../utils/encoder";
-import { KafkaTSApiError } from "../utils/error";
+import { createApi } from '../utils/api';
+import { Encoder } from '../utils/encoder';
+import { KafkaTSApiError } from '../utils/error';
 
 export const JOIN_GROUP = createApi({
     apiKey: 11,

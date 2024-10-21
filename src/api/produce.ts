@@ -1,6 +1,6 @@
-import { createApi } from "../utils/api.js";
-import { Encoder } from "../utils/encoder.js";
-import { KafkaTSApiError } from "../utils/error.js";
+import { createApi } from '../utils/api.js';
+import { Encoder } from '../utils/encoder.js';
+import { KafkaTSApiError } from '../utils/error.js';
 
 export const PRODUCE = createApi({
     apiKey: 0,

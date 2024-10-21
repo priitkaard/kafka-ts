@@ -1,11 +1,11 @@
-import { API, API_ERROR } from "../api";
-import { Cluster } from "../cluster";
-import { distributeMessagesToTopicPartitionLeaders } from "../distributors/messages-to-topic-partition-leaders";
-import { Metadata } from "../metadata";
-import { Message } from "../types";
-import { delay } from "../utils/delay";
-import { KafkaTSApiError } from "../utils/error";
-import { memo } from "../utils/memo";
+import { API, API_ERROR } from '../api';
+import { Cluster } from '../cluster';
+import { distributeMessagesToTopicPartitionLeaders } from '../distributors/messages-to-topic-partition-leaders';
+import { Metadata } from '../metadata';
+import { Message } from '../types';
+import { delay } from '../utils/delay';
+import { KafkaTSApiError } from '../utils/error';
+import { memo } from '../utils/memo';
 
 export type ProducerOptions = {
     allowTopicAutoCreation?: boolean;

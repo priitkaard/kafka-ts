@@ -1,4 +1,4 @@
-import { delay } from "./delay";
+import { delay } from './delay';
 
 export type Retrier = (func: () => unknown) => Promise<void>;
 

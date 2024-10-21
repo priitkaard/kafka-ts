@@ -1,5 +1,5 @@
-import { createApi } from "../utils/api";
-import { KafkaTSApiError } from "../utils/error";
+import { createApi } from '../utils/api';
+import { KafkaTSApiError } from '../utils/error';
 
 export const SASL_AUTHENTICATE = createApi({
     apiKey: 36,

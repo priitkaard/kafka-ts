@@ -1,15 +1,16 @@
-import { API, API_ERROR } from "../api";
-import { IsolationLevel } from "../api/fetch";
-import { Assignment } from "../api/sync-group";
-import { Cluster } from "../cluster";
-import { distributeAssignmentsToNodes } from "../distributors/assignments-to-replicas";
-import { Message } from "../types";
-import { delay } from "../utils/delay";
-import { ConnectionError, KafkaTSApiError } from "../utils/error";
-import { defaultRetrier, Retrier } from "../utils/retrier";
-import { ConsumerGroup } from "./consumer-group";
-import { ConsumerMetadata } from "./consumer-metadata";
-import { OffsetManager } from "./offset-manager";
+import { API, API_ERROR } from '../api';
+import { IsolationLevel } from '../api/fetch';
+import { Assignment } from '../api/sync-group';
+import { Cluster } from '../cluster';
+import { distributeAssignmentsToNodes } from '../distributors/assignments-to-replicas';
+import { Message } from '../types';
+import { delay } from '../utils/delay';
+import { ConnectionError, KafkaTSApiError } from '../utils/error';
+import { defaultRetrier, Retrier } from '../utils/retrier';
+import { ConsumerGroup } from './consumer-group';
+import { ConsumerMetadata } from './consumer-metadata';
+import { FetchManager, Granularity } from './fetch-manager';
+import { OffsetManager } from './offset-manager';
 
 export type ConsumerOptions = {
     topics: string[];
@@ -26,13 +27,16 @@ export type ConsumerOptions = {
     allowTopicAutoCreation?: boolean;
     fromBeginning?: boolean;
     retrier?: Retrier;
-} & ({ onMessage: (message: Message) => unknown } | { onBatch: (messages: Message[]) => unknown });
+    granularity?: Granularity;
+    concurrency?: number;
+} & ({ onBatch: (messages: Required<Message>[]) => unknown } | { onMessage: (message: Required<Message>) => unknown });
 
 export class Consumer {
     private options: Required<ConsumerOptions>;
     private metadata: ConsumerMetadata;
     private consumerGroup: ConsumerGroup | undefined;
     private offsetManager: OffsetManager;
+    private fetchManager?: FetchManager;
     private stopHook: (() => void) | undefined;
 
     constructor(
@@ -43,7 +47,7 @@ export class Consumer {
             ...options,
             groupId: options.groupId ?? null,
             groupInstanceId: options.groupInstanceId ?? null,
-            rackId: options.rackId ?? "",
+            rackId: options.rackId ?? '',
             sessionTimeoutMs: options.sessionTimeoutMs ?? 30_000,
             rebalanceTimeoutMs: options.rebalanceTimeoutMs ?? 60_000,
             maxWaitMs: options.maxWaitMs ?? 5000,
@@ -54,6 +58,8 @@ export class Consumer {
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
             fromBeginning: options.fromBeginning ?? false,
             retrier: options.retrier ?? defaultRetrier,
+            granularity: options.granularity ?? 'broker',
+            concurrency: options.concurrency ?? 1,
         };
 
         this.metadata = new ConsumerMetadata({ cluster: this.cluster });
@@ -95,81 +101,63 @@ export class Consumer {
             if (this.stopHook) return (this.stopHook as () => void)();
             return this.close(true).then(() => this.start());
         }
-        this.fetchLoop();
+        setImmediate(() => this.startFetchManager());
     }
 
-    private fetchLoop = async () => {
-        const { options } = this;
-        const { retrier } = options;
+    public async close(force = false): Promise<void> {
+        if (!force) {
+            await new Promise<void>(async (resolve) => {
+                this.stopHook = resolve;
+                await this.fetchManager?.stop();
+            });
+        }
+        await this.consumerGroup
+            ?.leaveGroup()
+            .catch((error) => console.warn(`Failed to leave group: ${error.message}`));
+        await this.cluster.disconnect().catch((error) => console.warn(`Failed to disconnect: ${error.message}`));
+    }
 
-        let nodeAssignments: { nodeId: number; assignment: Assignment }[] = [];
-        let shouldReassign = true;
+    private startFetchManager = async () => {
+        const { granularity, concurrency } = this.options;
 
         while (!this.stopHook) {
-            if (shouldReassign || !nodeAssignments) {
-                nodeAssignments = Object.entries(
-                    distributeAssignmentsToNodes(
-                        this.metadata.getAssignment(),
-                        this.metadata.getTopicPartitionReplicaIds(),
-                    ),
-                ).map(([nodeId, assignment]) => ({ nodeId: parseInt(nodeId), assignment }));
-                shouldReassign = false;
-            }
+            const nodeAssignments = Object.entries(
+                distributeAssignmentsToNodes(
+                    this.metadata.getAssignment(),
+                    this.metadata.getTopicPartitionReplicaIds(),
+                ),
+            ).map(([nodeId, assignment]) => ({ nodeId: parseInt(nodeId), assignment }));
+
+            const numPartitions = Object.values(this.metadata.getAssignment()).flat().length;
+            const numProcessors = Math.min(concurrency, numPartitions);
+
+            this.fetchManager = new FetchManager({
+                fetch: this.fetch.bind(this),
+                process: this.process.bind(this),
+                metadata: this.metadata,
+                consumerGroup: this.consumerGroup,
+                nodeAssignments,
+                granularity,
+                concurrency: numProcessors,
+            });
 
             try {
-                for (const { nodeId, assignment } of nodeAssignments) {
-                    const batch = await this.fetch(nodeId, assignment);
-                    const messages = batch.responses.flatMap(({ topicId, partitions }) =>
-                        partitions.flatMap(({ partitionIndex, records }) =>
-                            records.flatMap(({ baseTimestamp, baseOffset, records }) =>
-                                records.map(
-                                    (message): Required<Message> => ({
-                                        topic: this.metadata.getTopicNameById(topicId),
-                                        partition: partitionIndex,
-                                        key: message.key ?? null,
-                                        value: message.value ?? null,
-                                        headers: Object.fromEntries(
-                                            message.headers.map(({ key, value }) => [key, value]),
-                                        ),
-                                        timestamp: baseTimestamp + BigInt(message.timestampDelta),
-                                        offset: baseOffset + BigInt(message.offsetDelta),
-                                    }),
-                                ),
-                            ),
-                        ),
-                    );
-
-                    if ("onBatch" in options) {
-                        await retrier(() => options.onBatch(messages));
-
-                        messages.forEach(({ topic, partition, offset }) =>
-                            this.offsetManager.resolve(topic, partition, offset + 1n),
-                        );
-                    } else if ("onMessage" in options) {
-                        for (const message of messages) {
-                            await retrier(() => options.onMessage(message));
-
-                            const { topic, partition, offset } = message;
-                            this.offsetManager.resolve(topic, partition, offset + 1n);
-                        }
-                    }
-                    await this.consumerGroup?.offsetCommit();
-                    await this.consumerGroup?.handleLastHeartbeat();
-                }
+                await this.fetchManager.start();
 
                 if (!nodeAssignments.length) {
-                    console.debug("No partitions assigned. Waiting for reassignment...");
+                    console.debug('No partitions assigned. Waiting for reassignment...');
                     await delay(this.options.maxWaitMs);
                     await this.consumerGroup?.handleLastHeartbeat();
                 }
             } catch (error) {
+                await this.fetchManager.stop();
+
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
-                    console.debug("Rebalance in progress...");
-                    shouldReassign = true;
+                    console.debug('Rebalance in progress...');
                     continue;
                 }
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.FENCED_INSTANCE_ID) {
-                    console.debug("New consumer with the same groupInstanceId joined. Exiting the consumer...");
+                    console.debug('New consumer with the same groupInstanceId joined. Exiting the consumer...');
                     this.close();
                     break;
                 }
@@ -182,23 +170,37 @@ export class Consumer {
                     break;
                 }
                 console.error(error);
-                await this.consumerGroup?.offsetCommit();
+                this.close();
                 break;
             }
         }
         this.stopHook?.();
     };
 
-    public async close(force = false): Promise<void> {
-        if (!force) {
-            await new Promise<void>((resolve) => {
-                this.stopHook = resolve;
-            });
+    private async process(messages: Required<Message>[]) {
+        const { options } = this;
+        const { retrier } = options;
+
+        if ('onBatch' in options) {
+            await retrier(() => options.onBatch(messages));
+
+            messages.forEach(({ topic, partition, offset }) =>
+                this.offsetManager.resolve(topic, partition, offset + 1n),
+            );
+        } else if ('onMessage' in options) {
+            try {
+                for (const message of messages) {
+                    await retrier(() => options.onMessage(message));
+
+                    const { topic, partition, offset } = message;
+                    this.offsetManager.resolve(topic, partition, offset + 1n);
+                }
+            } catch (error) {
+                await this.consumerGroup?.offsetCommit().catch(() => {});
+                throw error;
+            }
         }
-        await this.consumerGroup
-            ?.leaveGroup()
-            .catch((error) => console.warn(`Failed to leave group: ${error.message}`));
-        await this.cluster.disconnect().catch((error) => console.warn(`Failed to disconnect: ${error.message}`));
+        await this.consumerGroup?.offsetCommit();
     }
 
     private fetch(nodeId: number, assignment: Assignment) {

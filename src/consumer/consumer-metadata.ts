@@ -1,5 +1,5 @@
-import { Assignment } from "../api/sync-group";
-import { Metadata } from "../metadata";
+import { Assignment } from '../api/sync-group';
+import { Metadata } from '../metadata';
 
 export class ConsumerMetadata extends Metadata {
     private assignment: Assignment = {};

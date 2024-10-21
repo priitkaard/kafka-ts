@@ -74,9 +74,9 @@ export class Encoder {
         if (value === null) {
             return this.writeInt16(-1);
         }
-        const byteLength = Buffer.byteLength(value, "utf-8");
+        const byteLength = Buffer.byteLength(value, 'utf-8');
         const buffer = Buffer.alloc(byteLength);
-        buffer.write(value, 0, byteLength, "utf-8");
+        buffer.write(value, 0, byteLength, 'utf-8');
         return this.writeInt16(byteLength).write(buffer);
     }
 
@@ -85,9 +85,9 @@ export class Encoder {
             return this.writeUVarInt(0);
         }
 
-        const byteLength = Buffer.byteLength(value, "utf-8");
+        const byteLength = Buffer.byteLength(value, 'utf-8');
         const buffer = Buffer.alloc(byteLength);
-        buffer.write(value, 0, byteLength, "utf-8");
+        buffer.write(value, 0, byteLength, 'utf-8');
         return this.writeUVarInt(byteLength + 1).write(buffer);
     }
 
@@ -95,14 +95,14 @@ export class Encoder {
         if (value === null) {
             return this.writeVarInt(-1);
         }
-        return this.writeVarInt(Buffer.byteLength(value, "utf-8")).write(Buffer.from(value, "utf-8"));
+        return this.writeVarInt(Buffer.byteLength(value, 'utf-8')).write(Buffer.from(value, 'utf-8'));
     }
 
     public writeUUID(value: string | null) {
         if (value === null) {
             return this.write(Buffer.alloc(16));
         }
-        return this.write(Buffer.from(value, "hex"));
+        return this.write(Buffer.from(value, 'hex'));
     }
 
     public writeBoolean(value: boolean) {

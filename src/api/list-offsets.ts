@@ -1,6 +1,6 @@
-import { createApi } from "../utils/api";
-import { KafkaTSApiError } from "../utils/error";
-import { IsolationLevel } from "./fetch";
+import { createApi } from '../utils/api';
+import { KafkaTSApiError } from '../utils/error';
+import { IsolationLevel } from './fetch';
 
 export const LIST_OFFSETS = createApi({
     apiKey: 2,

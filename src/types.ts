@@ -7,3 +7,5 @@ export type Message = {
     value: string | null;
     headers?: Record<string, string>;
 };
+
+export type Batch = Required<Message>[];

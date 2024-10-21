@@ -1,9 +1,9 @@
-import { API } from "../api";
-import { IsolationLevel } from "../api/fetch";
-import { Assignment } from "../api/sync-group";
-import { Cluster } from "../cluster";
-import { distributeMessagesToTopicPartitionLeaders } from "../distributors/messages-to-topic-partition-leaders";
-import { ConsumerMetadata } from "./consumer-metadata";
+import { API } from '../api';
+import { IsolationLevel } from '../api/fetch';
+import { Assignment } from '../api/sync-group';
+import { Cluster } from '../cluster';
+import { distributeMessagesToTopicPartitionLeaders } from '../distributors/messages-to-topic-partition-leaders';
+import { ConsumerMetadata } from './consumer-metadata';
 
 type OffsetManagerOptions = {
     cluster: Cluster;

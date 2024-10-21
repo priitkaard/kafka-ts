@@ -1,4 +1,4 @@
-import { API_ERROR } from "../api";
+import { API_ERROR } from '../api';
 
 export class KafkaTSError extends Error {
     constructor(message: string) {
@@ -13,8 +13,8 @@ export class KafkaTSApiError<T = any> extends KafkaTSError {
         public errorMessage: string | null,
         public response: T,
     ) {
-        const [errorName] = Object.entries(API_ERROR).find(([, value]) => value === errorCode) ?? ["UNKNOWN"];
-        super(`${errorName}${errorMessage ? `: ${errorMessage}` : ""}`);
+        const [errorName] = Object.entries(API_ERROR).find(([, value]) => value === errorCode) ?? ['UNKNOWN'];
+        super(`${errorName}${errorMessage ? `: ${errorMessage}` : ''}`);
     }
 }
 

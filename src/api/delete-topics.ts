@@ -1,5 +1,5 @@
-import { createApi } from "../utils/api";
-import { KafkaTSApiError } from "../utils/error";
+import { createApi } from '../utils/api';
+import { KafkaTSApiError } from '../utils/error';
 
 export const DELETE_TOPICS = createApi({
     apiKey: 20,

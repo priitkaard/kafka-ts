@@ -1,9 +1,10 @@
-import { serializer } from "./debug";
+import { serializer } from './debug';
 
-export const trace =
+export const createTracer =
+    (module: string, attributes?: Record<string, unknown>) =>
     (fn?: (...args: any[]) => Record<string, unknown> | undefined) =>
     (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
-        if (!process.env.DEBUG?.includes("kafka-ts")) return;
+        if (!process.env.DEBUG?.includes('kafka-ts')) return;
 
         const original = descriptor.value;
         descriptor.value = function (...args: any[]) {
@@ -12,7 +13,7 @@ export const trace =
 
             const onEnd = <T>(result: T): T => {
                 console.log(
-                    `[${propertyKey}] +${Date.now() - startTime}ms ${JSON.stringify({ ...metadata, result }, serializer)}`,
+                    `[${module}.${propertyKey}] +${Date.now() - startTime}ms ${JSON.stringify({ ...attributes, ...metadata, result }, serializer)}`,
                 );
                 return result;
             };
@@ -26,3 +27,5 @@ export const trace =
             }
         };
     };
+
+export const trace = createTracer('GLOBAL');

@@ -81,7 +81,7 @@ export class Decoder {
             return null;
         }
 
-        const value = this.buffer.toString("utf-8", this.offset, this.offset + length);
+        const value = this.buffer.toString('utf-8', this.offset, this.offset + length);
         this.offset += length;
         return value;
     }
@@ -92,7 +92,7 @@ export class Decoder {
             return null;
         }
 
-        const value = this.buffer.toString("utf-8", this.offset, this.offset + length);
+        const value = this.buffer.toString('utf-8', this.offset, this.offset + length);
         this.offset += length;
         return value;
     }
@@ -103,13 +103,13 @@ export class Decoder {
             return null;
         }
 
-        const value = this.buffer.toString("utf-8", this.offset, this.offset + length);
+        const value = this.buffer.toString('utf-8', this.offset, this.offset + length);
         this.offset += length;
         return value;
     }
 
     public readUUID() {
-        const value = this.buffer.toString("hex", this.offset, this.offset + 16);
+        const value = this.buffer.toString('hex', this.offset, this.offset + 16);
         this.offset += 16;
         return value;
     }
