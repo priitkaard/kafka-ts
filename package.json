@@ -1,6 +1,6 @@
 {
     "name": "kafka-ts",
-    "version": "0.0.3-beta.0",
+    "version": "0.0.1-beta.0",
     "main": "dist/index.js",
     "author": "Priit Käärd",
     "license": "MIT",
@@ -9,6 +9,7 @@
         "url": "https://github.com/priitkaard/kafka-ts.git"
     },
     "scripts": {
+        "version:bump": "npm version prerelease --preid=beta",
         "format": "prettier --write .",
         "build": "tsc",
         "watch": "tsc -w",
