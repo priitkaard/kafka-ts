@@ -2,20 +2,18 @@ import { TcpSocketConnectOpts } from 'net';
 import { TLSSocketOptions } from 'tls';
 import { API } from './api';
 import { Connection, SendRequest } from './connection';
-import { base64Decode, base64Encode, generateNonce, hash, hmac, saltPassword, xor } from './utils/crypto';
 import { KafkaTSError } from './utils/error';
 import { memo } from './utils/memo';
 
-export type SASLOptions = {
-    mechanism: 'PLAIN' | 'SCRAM-SHA-256';
-    username: string;
-    password: string;
+export type SASLProvider = {
+    mechanism: string;
+    authenticate: (context: { sendRequest: SendRequest }) => Promise<void>;
 };
 
 type BrokerOptions = {
     clientId: string | null;
     options: TcpSocketConnectOpts;
-    sasl: SASLOptions | null;
+    sasl: SASLProvider | null;
     ssl: TLSSocketOptions | null;
 };
 
@@ -69,78 +67,6 @@ export class Broker {
     }
 
     private async saslAuthenticate() {
-        if (!this.options.sasl) {
-            return;
-        }
-
-        const { mechanism } = this.options.sasl;
-        const authenticate = { PLAIN: plainProvider, 'SCRAM-SHA-256': scramSha256Provider }[mechanism as string];
-        if (!authenticate) {
-            throw new KafkaTSError(`SASL mechanism ${mechanism} is not supported`);
-        }
-
-        await authenticate({
-            ...this.options.sasl,
-            sendRequest: this.sendRequest.bind(this),
-        });
+        await this.options.sasl?.authenticate({ sendRequest: this.sendRequest });
     }
 }
-
-const plainProvider = async ({
-    username,
-    password,
-    sendRequest,
-}: {
-    username: string;
-    password: string;
-    sendRequest: SendRequest;
-}) => {
-    const authBytes = [null, username, password].join('\u0000');
-    await sendRequest(API.SASL_AUTHENTICATE, { authBytes: Buffer.from(authBytes) });
-};
-
-const scramSha256Provider = async ({
-    username,
-    password,
-    sendRequest,
-}: {
-    username: string;
-    password: string;
-    sendRequest: SendRequest;
-}) => {
-    const nonce = generateNonce();
-    const firstMessage = `n=${username},r=${nonce}`;
-
-    const { authBytes } = await sendRequest(API.SASL_AUTHENTICATE, { authBytes: Buffer.from(`n,,${firstMessage}`) });
-    if (!authBytes) {
-        throw new KafkaTSError('No auth response');
-    }
-
-    const response = Object.fromEntries(
-        authBytes
-            .toString()
-            .split(',')
-            .map((pair) => pair.split('=')),
-    ) as { r: string; s: string; i: string };
-
-    const rnonce = response.r;
-    if (!rnonce.startsWith(nonce)) {
-        throw new KafkaTSError('Invalid nonce');
-    }
-    const iterations = parseInt(response.i);
-    const salt = base64Decode(response.s);
-
-    const saltedPassword = await saltPassword(password, salt, iterations, 32, 'sha256');
-    const clientKey = hmac(saltedPassword, 'Client Key');
-    const clientKeyHash = hash(clientKey);
-
-    let finalMessage = `c=${base64Encode('n,,')},r=${rnonce}`;
-
-    const fullMessage = `${firstMessage},${authBytes.toString()},${finalMessage}`;
-    const clientSignature = hmac(clientKeyHash, fullMessage);
-    const clientProof = base64Encode(xor(clientKey, clientSignature));
-
-    finalMessage += `,p=${clientProof}`;
-
-    await sendRequest(API.SASL_AUTHENTICATE, { authBytes: Buffer.from(finalMessage) });
-};

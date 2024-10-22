@@ -92,10 +92,18 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 -   **Consuming messages without consumer groups** - When you don't need the consumer to track the partition offsets, you can simply create a consumer without groupId and always either start consuming messages from the beginning or from the latest partition offset.
 -   **Low-level API requests** - It's possible to communicate directly with the Kafka cluster using the kafka api protocol.
 
+
+## Supported SASL mechanisms
+
+- PLAIN
+- SCRAM-SHA-256
+- SCRAM-SHA-512
+
+Custom SASL mechanisms can be implemented following the `SASLProvider` interface. See [src/auth](./src/auth) for examples.
+
 ## Backlog
 
-Minimal set of features required before a stable release:
+Minimal set of features left to implement before a stable release:
 
 -   Partitioner (Currently have to specify the partition on producer.send())
 -   API versioning (Currently only tested against Kafka 3.7+)
--   SASL SCRAM-SHA-512 support

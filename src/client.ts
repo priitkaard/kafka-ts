@@ -1,6 +1,6 @@
 import { TcpSocketConnectOpts } from 'net';
 import { TLSSocketOptions } from 'tls';
-import { SASLOptions } from './broker';
+import { SASLProvider } from './broker';
 import { Cluster } from './cluster';
 import { Consumer, ConsumerOptions } from './consumer/consumer';
 import { Producer, ProducerOptions } from './producer/producer';
@@ -8,7 +8,7 @@ import { Producer, ProducerOptions } from './producer/producer';
 type ClientOptions = {
     clientId?: string | null;
     bootstrapServers: TcpSocketConnectOpts[];
-    sasl?: SASLOptions | null;
+    sasl?: SASLProvider | null;
     ssl?: TLSSocketOptions | null;
 };
 

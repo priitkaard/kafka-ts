@@ -9,6 +9,7 @@ export const saltPassword = (password: string, salt: string, iterations: number,
 
 export const base64Encode = (input: Buffer | string) => Buffer.from(input).toString('base64');
 export const base64Decode = (input: string) => Buffer.from(input, 'base64').toString();
-export const hash = (data: Buffer) => createHash('sha256').update(data).digest();
-export const hmac = (key: Buffer, data: Buffer | string) => createHmac('sha256', key).update(data).digest();
+export const hash = (data: Buffer, digest: string) => createHash(digest).update(data).digest();
+export const hmac = (key: Buffer, data: Buffer | string, digest: string) =>
+    createHmac(digest, key).update(data).digest();
 export const xor = (a: Buffer, b: Buffer) => Buffer.from(a.map((byte, i) => byte ^ b[i]));

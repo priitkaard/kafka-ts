@@ -1,14 +1,14 @@
 import { TcpSocketConnectOpts } from 'net';
 import { TLSSocketOptions } from 'tls';
 import { API } from './api';
-import { Broker, SASLOptions } from './broker';
+import { Broker, SASLProvider } from './broker';
 import { SendRequest } from './connection';
 import { ConnectionError, KafkaTSError } from './utils/error';
 
 type ClusterOptions = {
     clientId: string | null;
     bootstrapServers: TcpSocketConnectOpts[];
-    sasl: SASLOptions | null;
+    sasl: SASLProvider | null;
     ssl: TLSSocketOptions | null;
 };
 

@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { API } from './api';
 import { KEY_TYPE } from './api/find-coordinator';
+import { saslPlain } from './auth';
 import { createKafkaClient } from './client';
 import { Cluster } from './cluster';
 import { KafkaTSApiError } from './utils/error';
@@ -10,7 +11,7 @@ import { KafkaTSApiError } from './utils/error';
 export const kafka = createKafkaClient({
     clientId: 'kafka-ts',
     bootstrapServers: [{ host: 'localhost', port: 9092 }],
-    sasl: { mechanism: 'PLAIN', username: 'admin', password: 'admin' },
+    sasl: saslPlain({ username: 'admin', password: 'admin' }),
     ssl: { ca: readFileSync('./certs/ca.crt').toString() },
 });
 
