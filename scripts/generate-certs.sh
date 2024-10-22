@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # 1. Generating a x509 (CA) cert from a private key:
 openssl genrsa -out certs/ca.key 4096

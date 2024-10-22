@@ -26,10 +26,9 @@ import { kafka } from './client';
             ],
         });
     } catch (error) {
-        if ((error as KafkaTSApiError).errorCode === API_ERROR.TOPIC_ALREADY_EXISTS) {
-            return;
+        if ((error as KafkaTSApiError).errorCode !== API_ERROR.TOPIC_ALREADY_EXISTS) {
+            throw error;
         }
-        throw error;
     }
 
     const metadata = await cluster.sendRequestToNode(controllerId)(API.METADATA, {

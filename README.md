@@ -98,4 +98,4 @@ Minimal set of features required before a stable release:
 
 -   Partitioner (Currently have to specify the partition on producer.send())
 -   API versioning (Currently only tested against Kafka 3.7+)
--   SASL SCRAM support (+ pluggable authentication providers)
+-   SASL SCRAM-SHA-512 support
