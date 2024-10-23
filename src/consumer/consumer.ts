@@ -9,7 +9,7 @@ import { ConnectionError, KafkaTSApiError } from '../utils/error';
 import { defaultRetrier, Retrier } from '../utils/retrier';
 import { ConsumerGroup } from './consumer-group';
 import { ConsumerMetadata } from './consumer-metadata';
-import { FetchManager, Granularity } from './fetch-manager';
+import { FetchManager, BatchGranularity } from './fetch-manager';
 import { OffsetManager } from './offset-manager';
 
 export type ConsumerOptions = {
@@ -27,7 +27,7 @@ export type ConsumerOptions = {
     allowTopicAutoCreation?: boolean;
     fromBeginning?: boolean;
     retrier?: Retrier;
-    granularity?: Granularity;
+    batchGranularity?: BatchGranularity;
     concurrency?: number;
 } & ({ onBatch: (messages: Required<Message>[]) => unknown } | { onMessage: (message: Required<Message>) => unknown });
 
@@ -52,13 +52,13 @@ export class Consumer {
             rebalanceTimeoutMs: options.rebalanceTimeoutMs ?? 60_000,
             maxWaitMs: options.maxWaitMs ?? 5000,
             minBytes: options.minBytes ?? 1,
-            maxBytes: options.maxBytes ?? 1_000_000,
-            partitionMaxBytes: options.partitionMaxBytes ?? 1_000_000,
+            maxBytes: options.maxBytes ?? 1_048_576,
+            partitionMaxBytes: options.partitionMaxBytes ?? 1_048_576,
             isolationLevel: options.isolationLevel ?? IsolationLevel.READ_UNCOMMITTED,
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
             fromBeginning: options.fromBeginning ?? false,
             retrier: options.retrier ?? defaultRetrier,
-            granularity: options.granularity ?? 'broker',
+            batchGranularity: options.batchGranularity ?? 'partition',
             concurrency: options.concurrency ?? 1,
         };
 
@@ -118,7 +118,7 @@ export class Consumer {
     }
 
     private startFetchManager = async () => {
-        const { granularity, concurrency } = this.options;
+        const { batchGranularity, concurrency } = this.options;
 
         while (!this.stopHook) {
             const nodeAssignments = Object.entries(
@@ -137,7 +137,7 @@ export class Consumer {
                 metadata: this.metadata,
                 consumerGroup: this.consumerGroup,
                 nodeAssignments,
-                granularity,
+                batchGranularity,
                 concurrency: numProcessors,
             });
 

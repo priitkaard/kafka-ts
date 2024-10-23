@@ -91,11 +91,11 @@ export class Encoder {
         return this.writeUVarInt(byteLength + 1).write(buffer);
     }
 
-    public writeVarIntString(value: string | null) {
-        if (value === null) {
+    public writeVarIntBuffer(buffer: Buffer | null) {
+        if (buffer === null) {
             return this.writeVarInt(-1);
         }
-        return this.writeVarInt(Buffer.byteLength(value, 'utf-8')).write(Buffer.from(value, 'utf-8'));
+        return this.writeVarInt(buffer.byteLength).write(buffer);
     }
 
     public writeUUID(value: string | null) {

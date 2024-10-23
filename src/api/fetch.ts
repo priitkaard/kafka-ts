@@ -130,11 +130,11 @@ const decodeRecords = (decoder: Decoder) => {
                 attributes: record.readInt8(),
                 timestampDelta: record.readVarLong(),
                 offsetDelta: record.readVarInt(),
-                key: record.readVarIntString(),
-                value: record.readVarIntString(),
+                key: record.readVarIntBuffer(),
+                value: record.readVarIntBuffer(),
                 headers: record.readCompactArray((header) => ({
-                    key: header.readVarIntString(),
-                    value: header.readVarIntString(),
+                    key: header.readVarIntBuffer(),
+                    value: header.readVarIntBuffer(),
                 })),
             })),
         });

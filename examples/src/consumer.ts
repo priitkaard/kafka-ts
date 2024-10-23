@@ -8,7 +8,7 @@ import { kafka } from './client';
         onBatch: (batch) => {
             console.log(batch);
         },
-        granularity: 'broker',
+        batchGranularity: 'broker',
         concurrency: 10,
     });
 

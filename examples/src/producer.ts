@@ -11,7 +11,7 @@ rl.on('line', async (line) => {
         {
             topic: 'example-topic-f',
             key: null,
-            value: line,
+            value: Buffer.from(line),
             partition: 0,
         },
     ]);

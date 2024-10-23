@@ -360,14 +360,60 @@ exports[`Request handler > should fetch messages 1`] = `
                   "attributes": 0,
                   "headers": [
                     {
-                      "key": "header-key",
-                      "value": "header-value",
+                      "key": {
+                        "data": [
+                          104,
+                          101,
+                          97,
+                          100,
+                          101,
+                          114,
+                          45,
+                          107,
+                          101,
+                          121,
+                        ],
+                        "type": "Buffer",
+                      },
+                      "value": {
+                        "data": [
+                          104,
+                          101,
+                          97,
+                          100,
+                          101,
+                          114,
+                          45,
+                          118,
+                          97,
+                          108,
+                          117,
+                          101,
+                        ],
+                        "type": "Buffer",
+                      },
                     },
                   ],
-                  "key": "key",
+                  "key": {
+                    "data": [
+                      107,
+                      101,
+                      121,
+                    ],
+                    "type": "Buffer",
+                  },
                   "offsetDelta": 0,
                   "timestampDelta": 0n,
-                  "value": "value",
+                  "value": {
+                    "data": [
+                      118,
+                      97,
+                      108,
+                      117,
+                      101,
+                    ],
+                    "type": "Buffer",
+                  },
                 },
               ],
             },
@@ -937,6 +983,156 @@ exports[`Request handler > should request metadata for all topics 1`] = `
   "controllerId": 0,
   "throttleTimeMs": 0,
   "topics": [
+    {
+      "_tag": undefined,
+      "errorCode": 0,
+      "isInternal": false,
+      "name": "my-topic",
+      "partitions": [
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 5,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 6,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 0,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 2,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 7,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 1,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 8,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 9,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 3,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 4,
+          "replicaNodes": [
+            0,
+          ],
+        },
+      ],
+      "topicAuthorizedOperations": -2147483648,
+      "topicId": "Any<UUID>",
+    },
     {
       "_tag": undefined,
       "errorCode": 0,

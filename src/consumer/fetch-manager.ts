@@ -11,7 +11,7 @@ import { Processor } from './processor';
 
 const trace = createTracer('FetchManager');
 
-export type Granularity = 'partition' | 'topic' | 'broker';
+export type BatchGranularity = 'partition' | 'topic' | 'broker';
 
 type FetchManagerOptions = {
     fetch: (nodeId: number, assignment: Assignment) => Promise<ReturnType<(typeof API.FETCH)['response']>>;
@@ -19,7 +19,7 @@ type FetchManagerOptions = {
     metadata: Metadata;
     consumerGroup?: ConsumerGroup;
     nodeAssignments: { nodeId: number; assignment: Assignment }[];
-    granularity: Granularity;
+    batchGranularity: BatchGranularity;
     concurrency: number;
 };
 
@@ -110,9 +110,9 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
     }
 
     private async onResponse(fetcherId: number, response: ReturnType<(typeof API.FETCH)['response']>) {
-        const { metadata, granularity } = this.options;
+        const { metadata, batchGranularity } = this.options;
 
-        const batches = fetchResponseToBatches(response, granularity, metadata);
+        const batches = fetchResponseToBatches(response, batchGranularity, metadata);
         if (batches.length) {
             this.queue.push(...batches);
             this.queue.push({ kind: 'checkpoint', fetcherId });
@@ -138,7 +138,7 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
 
 const fetchResponseToBatches = (
     batch: ReturnType<typeof API.FETCH.response>,
-    granularity: Granularity,
+    batchGranularity: BatchGranularity,
     metadata: Metadata,
 ): Batch[] => {
     const brokerTopics = batch.responses.map(({ topicId, partitions }) =>
@@ -159,7 +159,7 @@ const fetchResponseToBatches = (
         ),
     );
 
-    switch (granularity) {
+    switch (batchGranularity) {
         case 'broker':
             const messages = brokerTopics.flatMap((topicPartition) =>
                 topicPartition.flatMap((partitionMessages) => partitionMessages),
@@ -174,6 +174,6 @@ const fetchResponseToBatches = (
                 topicPartition.map((partitionMessages) => partitionMessages),
             );
         default:
-            throw new KafkaTSError(`Unhandled batch granularity: ${granularity}`);
+            throw new KafkaTSError(`Unhandled batch granularity: ${batchGranularity}`);
     }
 };

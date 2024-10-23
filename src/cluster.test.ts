@@ -149,12 +149,12 @@ describe.sequential('Request handler', () => {
                                     attributes: 0,
                                     offsetDelta: 0,
                                     timestampDelta: 0n,
-                                    key: 'key',
-                                    value: 'value',
+                                    key: Buffer.from('key'),
+                                    value: Buffer.from('value'),
                                     headers: [
                                         {
-                                            key: 'header-key',
-                                            value: 'header-value',
+                                            key: Buffer.from('header-key'),
+                                            value: Buffer.from('header-value'),
                                         },
                                     ],
                                 },

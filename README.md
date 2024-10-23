@@ -92,12 +92,51 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 -   **Consuming messages without consumer groups** - When you don't need the consumer to track the partition offsets, you can simply create a consumer without groupId and always either start consuming messages from the beginning or from the latest partition offset.
 -   **Low-level API requests** - It's possible to communicate directly with the Kafka cluster using the kafka api protocol.
 
+## Configuration
 
-## Supported SASL mechanisms
+### `createKafkaClient()`
 
-- PLAIN
-- SCRAM-SHA-256
-- SCRAM-SHA-512
+| Name             | Type                   | Required | Default | Description                                           |
+| ---------------- | ---------------------- | -------- | ------- | ----------------------------------------------------- |
+| clientId         | string                 | false    | _null_  | The client id used for all requests.                  |
+| bootstrapServers | TcpSocketConnectOpts[] | true     |         | List of kafka brokers for initial cluster discovery.  |
+| sasl             | SASLProvider           | false    |         | SASL provider (see "Supported SASL mechanisms" below) |
+| ssl              | TLSSocketOptions       | false    |         | SSL configuration.                                    |
+
+### `kafka.startConsumer()`
+
+| Name                   | Type                                   | Required | Default   | Description                                                                                                                                                                                                                                                                      |
+| ---------------------- | -------------------------------------- | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| topics                 | string[]                               | true     |           | List of topics to subscribe to                                                                                                                                                                                                                                                   |
+| groupId                | string                                 | false    | _null_    | Consumer group id                                                                                                                                                                                                                                                                |
+| groupInstanceId        | string                                 | false    | _null_    | Consumer group instance id                                                                                                                                                                                                                                                       |
+| rackId                 | string                                 | false    | _null_    | Rack id                                                                                                                                                                                                                                                                          |
+| isolationLevel         | IsolationLevel                         | false    |           | Isolation level                                                                                                                                                                                                                                                                  |
+| sessionTimeoutMs       | number                                 | false    | 30000     | Session timeout in milliseconds                                                                                                                                                                                                                                                  |
+| rebalanceTimeoutMs     | number                                 | false    | 60000     | Rebalance timeout in milliseconds                                                                                                                                                                                                                                                |
+| maxWaitMs              | number                                 | false    | 5000      | Fetch long poll timeout in milliseconds                                                                                                                                                                                                                                          |
+| minBytes               | number                                 | false    | 1         | Minimum number of bytes to wait for before returning a fetch response                                                                                                                                                                                                            |
+| maxBytes               | number                                 | false    | 1_048_576 | Maximum number of bytes to return in the fetch response                                                                                                                                                                                                                          |
+| partitionMaxBytes      | number                                 | false    | 1_048_576 | Maximum number of bytes to return per partition in the fetch response                                                                                                                                                                                                            |
+| allowTopicAutoCreation | boolean                                | false    | false     | Allow kafka to auto-create topic when it doesn't exist                                                                                                                                                                                                                           |
+| fromBeginning          | boolean                                | false    | false     | Start consuming from the beginning of the topic                                                                                                                                                                                                                                  |
+| batchGranularity       | BatchGranularity                       | false    | partition | Controls messages split from fetch response. Also controls how often offsets are committed. **onBatch** will include messages:<br/>- **partition** - from a single batch<br/>- **topic** - from all topic partitions<br/>- **broker** - from all assignned topics and partitions |
+| concurrency            | number                                 | false    | 1         | How many batches to process concurrently                                                                                                                                                                                                                                         |
+| onMessage              | (message: Message) => Promise<unknown> | true     |           | Callback executed on every message                                                                                                                                                                                                                                               |
+| onBatch                | (batch: Message[]) => Promise<unknown> | true     |           | Callback executed on every batch of messages (based on **batchGranuality**)                                                                                                                                                                                                      |
+
+### `kafka.createProducer()`
+
+| Name                   | Type        | Required | Default | Description                                                                             |
+| ---------------------- | ----------- | -------- | ------- | --------------------------------------------------------------------------------------- |
+| allowTopicAutoCreation | boolean     | false    | false   | Allow kafka to auto-create topic when it doesn't exist                                  |
+| partitioner            | Partitioner | false    |         | Custom partitioner function. By default, it uses a default java-compatible partitioner. |
+
+### Supported SASL mechanisms
+
+-   PLAIN: `saslPlain({ username, password })`
+-   SCRAM-SHA-256: `saslScramSha256({ username, password })`
+-   SCRAM-SHA-512: `saslScramSha512({ username, password })`
 
 Custom SASL mechanisms can be implemented following the `SASLProvider` interface. See [src/auth](./src/auth) for examples.
 
@@ -105,5 +144,4 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 
 Minimal set of features left to implement before a stable release:
 
--   Partitioner (Currently have to specify the partition on producer.send())
 -   API versioning (Currently only tested against Kafka 3.7+)

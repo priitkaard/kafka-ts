@@ -97,13 +97,13 @@ export class Decoder {
         return value;
     }
 
-    public readVarIntString() {
+    public readVarIntBuffer() {
         const length = this.readVarInt();
         if (length < 0) {
             return null;
         }
 
-        const value = this.buffer.toString('utf-8', this.offset, this.offset + length);
+        const value = this.buffer.subarray(this.offset, this.offset + length);
         this.offset += length;
         return value;
     }

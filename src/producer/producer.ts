@@ -1,6 +1,7 @@
 import { API, API_ERROR } from '../api';
 import { Cluster } from '../cluster';
 import { distributeMessagesToTopicPartitionLeaders } from '../distributors/messages-to-topic-partition-leaders';
+import { defaultPartitioner, Partition, Partitioner } from '../distributors/partitioner';
 import { Metadata } from '../metadata';
 import { Message } from '../types';
 import { delay } from '../utils/delay';
@@ -9,6 +10,7 @@ import { memo } from '../utils/memo';
 
 export type ProducerOptions = {
     allowTopicAutoCreation?: boolean;
+    partitioner?: Partitioner;
 };
 
 export class Producer {
@@ -17,6 +19,7 @@ export class Producer {
     private producerId = 0n;
     private producerEpoch = 0;
     private sequences: Record<string, Record<number, number>> = {};
+    private partition: Partition;
 
     constructor(
         private cluster: Cluster,
@@ -25,8 +28,10 @@ export class Producer {
         this.options = {
             ...options,
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
+            partitioner: options.partitioner ?? defaultPartitioner,
         };
         this.metadata = new Metadata({ cluster });
+        this.partition = this.options.partitioner({ metadata: this.metadata });
     }
 
     public async send(messages: Message[]) {
@@ -39,7 +44,7 @@ export class Producer {
         await this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation });
 
         const nodeTopicPartitionMessages = distributeMessagesToTopicPartitionLeaders(
-            messages,
+            messages.map(message => ({ ...message, partition: this.partition(message) })),
             this.metadata.getTopicPartitionLeaderIds(),
         );
 
@@ -83,8 +88,8 @@ export class Producer {
                                     key: message.key,
                                     value: message.value,
                                     headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({
-                                        key,
-                                        value,
+                                        key: Buffer.from(key),
+                                        value: Buffer.from(value),
                                     })),
                                 })),
                             };

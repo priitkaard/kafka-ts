@@ -28,11 +28,11 @@ export const PRODUCE = createApi({
                         attributes: number;
                         timestampDelta: bigint;
                         offsetDelta: number;
-                        key: string | null;
-                        value: string | null;
+                        key: Buffer | null;
+                        value: Buffer | null;
                         headers: {
-                            key: string;
-                            value: string;
+                            key: Buffer;
+                            value: Buffer;
                         }[];
                     }[];
                 }[];
@@ -61,10 +61,10 @@ export const PRODUCE = createApi({
                                     .writeInt8(record.attributes)
                                     .writeVarLong(record.timestampDelta)
                                     .writeVarInt(record.offsetDelta)
-                                    .writeVarIntString(record.key)
-                                    .writeVarIntString(record.value)
+                                    .writeVarIntBuffer(record.key)
+                                    .writeVarIntBuffer(record.value)
                                     .writeVarIntArray(record.headers, (encoder, header) =>
-                                        encoder.writeVarIntString(header.key).writeVarIntString(header.value),
+                                        encoder.writeVarIntBuffer(header.key).writeVarIntBuffer(header.value),
                                     )
                                     .value();
 
