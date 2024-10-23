@@ -5,8 +5,9 @@ import { kafka } from './client';
         groupId: 'example-group',
         groupInstanceId: 'example-group-instance',
         topics: ['my-topic'],
+        allowTopicAutoCreation: true,
         onBatch: (batch) => {
-            console.log(batch);
+            console.log(batch.map(message => ({ ...message, value: message.value?.toString() })));
         },
         batchGranularity: 'broker',
         concurrency: 10,

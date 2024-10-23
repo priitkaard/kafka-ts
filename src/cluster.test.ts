@@ -52,8 +52,8 @@ describe.sequential('Request handler', () => {
             topics: [
                 {
                     name: 'kafka-ts-test-topic',
-                    numPartitions: 1,
-                    replicationFactor: 1,
+                    numPartitions: 10,
+                    replicationFactor: 3,
                     assignments: [],
                     configs: [],
                 },
@@ -89,6 +89,7 @@ describe.sequential('Request handler', () => {
         expect(result).toMatchSnapshot();
     });
 
+    let partitionIndex = 0;
     let leaderId = 0;
 
     it('should request metadata for a topic', async () => {
@@ -97,6 +98,7 @@ describe.sequential('Request handler', () => {
             allowTopicAutoCreation: false,
             includeTopicAuthorizedOperations: false,
         });
+        partitionIndex = result.topics[0].partitions[0].partitionIndex;
         leaderId = result.topics[0].partitions[0].leaderId;
         result.controllerId = 0;
         result.topics.forEach((topic) => {
@@ -134,7 +136,7 @@ describe.sequential('Request handler', () => {
                     name: 'kafka-ts-test-topic',
                     partitionData: [
                         {
-                            index: 0,
+                            index: partitionIndex,
                             baseOffset: 0n,
                             partitionLeaderEpoch: 0,
                             attributes: 0,
@@ -180,7 +182,7 @@ describe.sequential('Request handler', () => {
                     topicId,
                     partitions: [
                         {
-                            partition: 0,
+                            partition: partitionIndex,
                             currentLeaderEpoch: -1,
                             fetchOffset: 0n,
                             lastFetchedEpoch: 0,

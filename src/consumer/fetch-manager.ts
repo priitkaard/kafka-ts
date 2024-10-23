@@ -78,7 +78,6 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
         ]);
     }
 
-    @trace()
     public async poll(): Promise<Batch> {
         if (!this.isRunning) {
             return [];

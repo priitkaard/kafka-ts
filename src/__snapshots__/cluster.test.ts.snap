@@ -282,8 +282,8 @@ exports[`Request handler > should create topics 1`] = `
       "errorCode": 0,
       "errorMessage": null,
       "name": "kafka-ts-test-topic",
-      "numPartitions": 1,
-      "replicationFactor": 1,
+      "numPartitions": 10,
+      "replicationFactor": 3,
       "topicId": "Any<UUID>",
     },
   ],
@@ -944,6 +944,132 @@ exports[`Request handler > should request metadata for a topic 1`] = `
             0,
           ],
         },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 2,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 1,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 6,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 9,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 5,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 3,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 8,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 4,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 7,
+          "replicaNodes": [
+            0,
+          ],
+        },
       ],
       "topicAuthorizedOperations": -2147483648,
       "topicId": "Any<UUID>",
@@ -987,36 +1113,8 @@ exports[`Request handler > should request metadata for all topics 1`] = `
       "_tag": undefined,
       "errorCode": 0,
       "isInternal": false,
-      "name": "my-topic",
+      "name": "kafka-ts-test-topic",
       "partitions": [
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 5,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 6,
-          "replicaNodes": [
-            0,
-          ],
-        },
         {
           "_tag": undefined,
           "errorCode": 0,
@@ -1054,20 +1152,6 @@ exports[`Request handler > should request metadata for all topics 1`] = `
           "leaderEpoch": 0,
           "leaderId": 0,
           "offlineReplicas": [],
-          "partitionIndex": 7,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
           "partitionIndex": 1,
           "replicaNodes": [
             0,
@@ -1082,7 +1166,7 @@ exports[`Request handler > should request metadata for all topics 1`] = `
           "leaderEpoch": 0,
           "leaderId": 0,
           "offlineReplicas": [],
-          "partitionIndex": 8,
+          "partitionIndex": 6,
           "replicaNodes": [
             0,
           ],
@@ -1110,7 +1194,35 @@ exports[`Request handler > should request metadata for all topics 1`] = `
           "leaderEpoch": 0,
           "leaderId": 0,
           "offlineReplicas": [],
+          "partitionIndex": 5,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
           "partitionIndex": 3,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 8,
           "replicaNodes": [
             0,
           ],
@@ -1129,16 +1241,6 @@ exports[`Request handler > should request metadata for all topics 1`] = `
             0,
           ],
         },
-      ],
-      "topicAuthorizedOperations": -2147483648,
-      "topicId": "Any<UUID>",
-    },
-    {
-      "_tag": undefined,
-      "errorCode": 0,
-      "isInternal": false,
-      "name": "kafka-ts-test-topic",
-      "partitions": [
         {
           "_tag": undefined,
           "errorCode": 0,
@@ -1148,7 +1250,7 @@ exports[`Request handler > should request metadata for all topics 1`] = `
           "leaderEpoch": 0,
           "leaderId": 0,
           "offlineReplicas": [],
-          "partitionIndex": 0,
+          "partitionIndex": 7,
           "replicaNodes": [
             0,
           ],

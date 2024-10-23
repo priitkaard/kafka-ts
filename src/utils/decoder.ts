@@ -132,6 +132,12 @@ export class Decoder {
         return results;
     }
 
+    public readVarIntArray<T>(callback: (opts: Decoder) => T): T[] {
+        const length = this.readVarInt();
+        const results = Array.from({ length }).map(() => callback(this));
+        return results;
+    }
+
     public readRecords<T>(callback: (opts: Decoder) => T): T[] {
         const length = this.readInt32();
 

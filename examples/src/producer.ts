@@ -9,7 +9,7 @@ process.stdout.write('> ');
 rl.on('line', async (line) => {
     await producer.send([
         {
-            topic: 'example-topic-f',
+            topic: 'my-topic',
             value: Buffer.from(line),
         },
     ]);

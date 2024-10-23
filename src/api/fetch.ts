@@ -132,7 +132,7 @@ const decodeRecords = (decoder: Decoder) => {
                 offsetDelta: record.readVarInt(),
                 key: record.readVarIntBuffer(),
                 value: record.readVarIntBuffer(),
-                headers: record.readCompactArray((header) => ({
+                headers: record.readVarIntArray((header) => ({
                     key: header.readVarIntBuffer(),
                     value: header.readVarIntBuffer(),
                 })),
