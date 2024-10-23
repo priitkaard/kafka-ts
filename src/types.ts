@@ -1,9 +1,9 @@
 export type Message = {
     topic: string;
-    partition: number;
+    partition?: number;
     offset?: bigint;
     timestamp?: bigint;
-    key: Buffer | null;
+    key?: Buffer | null;
     value: Buffer | null;
     headers?: Record<string, string>;
 };

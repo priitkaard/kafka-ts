@@ -10,9 +10,7 @@ rl.on('line', async (line) => {
     await producer.send([
         {
             topic: 'example-topic-f',
-            key: null,
             value: Buffer.from(line),
-            partition: 0,
         },
     ]);
     process.stdout.write('> ');

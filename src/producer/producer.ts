@@ -85,7 +85,7 @@ export class Producer {
                                     attributes: 0,
                                     timestampDelta: (message.timestamp ?? defaultTimestamp) - (baseTimestamp ?? 0n),
                                     offsetDelta: index,
-                                    key: message.key,
+                                    key: message.key ?? null,
                                     value: message.value,
                                     headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({
                                         key: Buffer.from(key),
