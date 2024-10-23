@@ -10,7 +10,7 @@ import { kafka } from './client';
             console.log(batch.map(message => ({ ...message, value: message.value?.toString() })));
         },
         batchGranularity: 'broker',
-        concurrency: 10,
+        concurrency: 1,
     });
 
     process.on('SIGINT', async () => {

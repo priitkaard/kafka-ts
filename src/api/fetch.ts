@@ -113,7 +113,7 @@ const decodeRecords = (decoder: Decoder) => {
 
     const results = [];
     while (decoder.getBufferLength() > decoder.getOffset() + 49) {
-        results.push({
+        const result = {
             baseOffset: decoder.readInt64(),
             batchLength: decoder.readInt32(),
             partitionLeaderEpoch: decoder.readInt32(),
@@ -126,18 +126,35 @@ const decodeRecords = (decoder: Decoder) => {
             producerId: decoder.readInt64(),
             producerEpoch: decoder.readInt16(),
             baseSequence: decoder.readInt32(),
-            records: decoder.readRecords((record) => ({
-                attributes: record.readInt8(),
-                timestampDelta: record.readVarLong(),
-                offsetDelta: record.readVarInt(),
-                key: record.readVarIntBuffer(),
-                value: record.readVarIntBuffer(),
-                headers: record.readVarIntArray((header) => ({
-                    key: header.readVarIntBuffer(),
-                    value: header.readVarIntBuffer(),
+        };
+        const compression = result.attributes & 0x07;
+        const timestampType = (result.attributes & 0x08) >> 3 ? 'LogAppendTime' : 'CreateTime';
+        const isTransactional = !!((result.attributes & 0x10) >> 4);
+        const isControlBatch = !!((result.attributes & 0x20) >> 5);
+        const hasDeleteHorizonMs = !!((result.attributes & 0x40) >> 6);
+        if (compression === 0) {
+            results.push({
+                ...result,
+                compression,
+                timestampType,
+                isTransactional,
+                isControlBatch,
+                hasDeleteHorizonMs,
+                records: decoder.readRecords((record) => ({
+                    attributes: record.readInt8(),
+                    timestampDelta: record.readVarLong(),
+                    offsetDelta: record.readVarInt(),
+                    key: record.readVarIntBuffer(),
+                    value: record.readVarIntBuffer(),
+                    headers: record.readVarIntArray((header) => ({
+                        key: header.readVarIntBuffer(),
+                        value: header.readVarIntBuffer(),
+                    })),
                 })),
-            })),
-        });
+            });
+        } else {
+            throw new Error('Compression not supported yet');
+        }
     }
     return results;
 };

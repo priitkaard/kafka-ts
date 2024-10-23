@@ -7,6 +7,10 @@ export class Decoder {
         return this.offset;
     }
 
+    public getBuffer() {
+        return this.buffer;
+    }
+
     public getBufferLength() {
         return this.buffer.length;
     }

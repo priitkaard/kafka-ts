@@ -6,10 +6,9 @@ import { distributeAssignmentsToNodes } from '../distributors/assignments-to-rep
 import { Message } from '../types';
 import { delay } from '../utils/delay';
 import { ConnectionError, KafkaTSApiError } from '../utils/error';
-import { defaultRetrier, Retrier } from '../utils/retrier';
 import { ConsumerGroup } from './consumer-group';
 import { ConsumerMetadata } from './consumer-metadata';
-import { FetchManager, BatchGranularity } from './fetch-manager';
+import { BatchGranularity, FetchManager } from './fetch-manager';
 import { OffsetManager } from './offset-manager';
 
 export type ConsumerOptions = {
@@ -26,7 +25,6 @@ export type ConsumerOptions = {
     partitionMaxBytes?: number;
     allowTopicAutoCreation?: boolean;
     fromBeginning?: boolean;
-    retrier?: Retrier;
     batchGranularity?: BatchGranularity;
     concurrency?: number;
 } & ({ onBatch: (messages: Required<Message>[]) => unknown } | { onMessage: (message: Required<Message>) => unknown });
@@ -57,7 +55,6 @@ export class Consumer {
             isolationLevel: options.isolationLevel ?? IsolationLevel.READ_UNCOMMITTED,
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
             fromBeginning: options.fromBeginning ?? false,
-            retrier: options.retrier ?? defaultRetrier,
             batchGranularity: options.batchGranularity ?? 'partition',
             concurrency: options.concurrency ?? 1,
         };
@@ -101,7 +98,7 @@ export class Consumer {
             if (this.stopHook) return (this.stopHook as () => void)();
             return this.close(true).then(() => this.start());
         }
-        setImmediate(() => this.startFetchManager());
+        this.startFetchManager();
     }
 
     public async close(force = false): Promise<void> {
@@ -179,10 +176,9 @@ export class Consumer {
 
     private async process(messages: Required<Message>[]) {
         const { options } = this;
-        const { retrier } = options;
 
         if ('onBatch' in options) {
-            await retrier(() => options.onBatch(messages));
+            await options.onBatch(messages);
 
             messages.forEach(({ topic, partition, offset }) =>
                 this.offsetManager.resolve(topic, partition, offset + 1n),
@@ -190,7 +186,7 @@ export class Consumer {
         } else if ('onMessage' in options) {
             try {
                 for (const message of messages) {
-                    await retrier(() => options.onMessage(message));
+                    await options.onMessage(message);
 
                     const { topic, partition, offset } = message;
                     this.offsetManager.resolve(topic, partition, offset + 1n);
