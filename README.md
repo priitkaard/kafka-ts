@@ -164,5 +164,4 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 
 Minimal set of features left to implement before a stable release:
 
--   Compression support
 -   API versioning (Currently only tested against Kafka 3.7+)
