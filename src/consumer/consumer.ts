@@ -2,7 +2,7 @@ import { API, API_ERROR } from '../api';
 import { IsolationLevel } from '../api/fetch';
 import { Assignment } from '../api/sync-group';
 import { Cluster } from '../cluster';
-import { distributeAssignmentsToNodes } from '../distributors/assignments-to-replicas';
+import { distributeMessagesToTopicPartitionLeaders } from '../distributors/messages-to-topic-partition-leaders';
 import { Message } from '../types';
 import { delay } from '../utils/delay';
 import { ConnectionError, KafkaTSApiError } from '../utils/error';
@@ -121,12 +121,23 @@ export class Consumer {
         const { batchGranularity, concurrency } = this.options;
 
         while (!this.stopHook) {
+            // TODO: If leader is not available, find another read replica
             const nodeAssignments = Object.entries(
-                distributeAssignmentsToNodes(
-                    this.metadata.getAssignment(),
-                    this.metadata.getTopicPartitionReplicaIds(),
+                distributeMessagesToTopicPartitionLeaders(
+                    Object.entries(this.metadata.getAssignment()).flatMap(([topic, partitions]) =>
+                        partitions.map((partition) => ({ topic, partition })),
+                    ),
+                    this.metadata.getTopicPartitionLeaderIds(),
                 ),
-            ).map(([nodeId, assignment]) => ({ nodeId: parseInt(nodeId), assignment }));
+            ).map(([nodeId, assignment]) => ({
+                nodeId: parseInt(nodeId),
+                assignment: Object.fromEntries(
+                    Object.entries(assignment).map(([topic, partitions]) => [
+                        topic,
+                        Object.keys(partitions).map(Number),
+                    ]),
+                ),
+            }));
 
             const numPartitions = Object.values(this.metadata.getAssignment()).flat().length;
             const numProcessors = Math.min(concurrency, numPartitions);

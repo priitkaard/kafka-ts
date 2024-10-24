@@ -12,7 +12,7 @@ rl.on('line', async (line) => {
             topic: 'my-topic',
             value: Buffer.from(line),
         },
-    ]);
+    ], { acks: -1 });
     process.stdout.write('> ');
 });
 

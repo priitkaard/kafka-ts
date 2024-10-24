@@ -34,7 +34,7 @@ export class Producer {
         this.partition = this.options.partitioner({ metadata: this.metadata });
     }
 
-    public async send(messages: Message[], { acks = -1 }: { acks?: -1 | 0 | 1 } = {}) {
+    public async send(messages: Message[], { acks = -1 }: { acks?: -1 | 1 } = {}) {
         await this.ensureConnected();
 
         const { allowTopicAutoCreation } = this.options;
