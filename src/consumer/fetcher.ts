@@ -10,8 +10,8 @@ type FetcherOptions = {
     nodeId: number;
     assignment: Assignment;
     consumerGroup?: ConsumerGroup;
-    fetch: (nodeId: number, assignment: Assignment) => Promise<ReturnType<(typeof API.FETCH)['response']>>;
-    onResponse: (fetcherId: number, response: ReturnType<(typeof API.FETCH)['response']>) => Promise<void>;
+    fetch: (nodeId: number, assignment: Assignment) => Promise<Awaited<ReturnType<(typeof API.FETCH)['response']>>>;
+    onResponse: (fetcherId: number, response: Awaited<ReturnType<(typeof API.FETCH)['response']>>) => Promise<void>;
 };
 
 export class Fetcher extends EventEmitter<{ stop: []; stopped: []; data: []; drain: [] }> {

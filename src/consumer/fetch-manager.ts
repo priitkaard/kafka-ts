@@ -14,7 +14,7 @@ const trace = createTracer('FetchManager');
 export type BatchGranularity = 'partition' | 'topic' | 'broker';
 
 type FetchManagerOptions = {
-    fetch: (nodeId: number, assignment: Assignment) => Promise<ReturnType<(typeof API.FETCH)['response']>>;
+    fetch: (nodeId: number, assignment: Assignment) => Promise<Awaited<ReturnType<(typeof API.FETCH)['response']>>>;
     process: (batch: Batch) => Promise<void>;
     metadata: Metadata;
     consumerGroup?: ConsumerGroup;
@@ -108,7 +108,7 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
         return batch as Exclude<Entry, Checkpoint>;
     }
 
-    private async onResponse(fetcherId: number, response: ReturnType<(typeof API.FETCH)['response']>) {
+    private async onResponse(fetcherId: number, response: Awaited<ReturnType<(typeof API.FETCH)['response']>>) {
         const { metadata, batchGranularity } = this.options;
 
         const batches = fetchResponseToBatches(response, batchGranularity, metadata);
@@ -136,7 +136,7 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
 }
 
 const fetchResponseToBatches = (
-    batch: ReturnType<typeof API.FETCH.response>,
+    batch: Awaited<ReturnType<typeof API.FETCH.response>>,
     batchGranularity: BatchGranularity,
     metadata: Metadata,
 ): Batch[] => {

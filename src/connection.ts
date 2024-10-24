@@ -90,7 +90,7 @@ export class Connection {
                 reject(error);
             }
         });
-        const response = api.response(responseDecoder);
+        const response = await api.response(responseDecoder);
 
         assert(
             responseDecoder.getOffset() - 4 === responseSize,

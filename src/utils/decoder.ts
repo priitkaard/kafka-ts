@@ -153,9 +153,9 @@ export class Decoder {
         });
     }
 
-    public read(length: number) {
-        const value = this.buffer.subarray(this.offset, this.offset + length);
-        this.offset += length;
+    public read(length?: number) {
+        const value = this.buffer.subarray(this.offset, length !== undefined ? this.offset + length : undefined);
+        this.offset += Buffer.byteLength(value);
         return value;
     }
 

@@ -1,3 +1,4 @@
+import { findCodec } from '../codecs';
 import { createApi } from '../utils/api';
 import { Decoder } from '../utils/decoder';
 import { KafkaTSApiError } from '../utils/error';
@@ -68,7 +69,7 @@ export const FETCH = createApi({
             )
             .writeCompactString(data.rackId)
             .writeUVarInt(0),
-    response: (decoder) => {
+    response: async (decoder) => {
         const result = {
             _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
@@ -88,73 +89,105 @@ export const FETCH = createApi({
                         _tag: abortedTransaction.readTagBuffer(),
                     })),
                     preferredReadReplica: partition.readInt32(),
-                    records: decodeRecords(partition),
+                    records: decodeRecordBatch(partition),
                     _tag: partition.readTagBuffer(),
                 })),
                 _tag: response.readTagBuffer(),
             })),
             _tag2: decoder.readTagBuffer(),
         };
+
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
         result.responses.forEach((response) => {
             response.partitions.forEach((partition) => {
                 if (partition.errorCode) throw new KafkaTSApiError(partition.errorCode, null, result);
             });
         });
-        return result;
+
+        const decompressedResponses = await Promise.all(
+            result.responses.map(async (response) => ({
+                ...response,
+                partitions: await Promise.all(
+                    response.partitions.map(async (partition) => ({
+                        ...partition,
+                        records: await Promise.all(
+                            partition.records.map(async ({ recordsLength, compressedRecords, ...record }) => {
+                                const { decompress } = findCodec(record.compression);
+                                const decompressedRecords = await decompress(compressedRecords);
+                                const decompressedDecoder = new Decoder(
+                                    Buffer.concat([recordsLength, decompressedRecords]),
+                                );
+                                return { ...record, records: decodeRecord(decompressedDecoder) };
+                            }),
+                        ),
+                    })),
+                ),
+            })),
+        );
+
+        return { ...result, responses: decompressedResponses };
     },
 });
 
-const decodeRecords = (decoder: Decoder) => {
+const decodeRecordBatch = (decoder: Decoder) => {
     const size = decoder.readUVarInt() - 1;
     if (size <= 0) {
         return [];
     }
 
+    const recordBatchDecoder = new Decoder(decoder.read(size));
+
     const results = [];
-    while (decoder.getBufferLength() > decoder.getOffset() + 49) {
+    while (recordBatchDecoder.getBufferLength() > recordBatchDecoder.getOffset()) {
+        const baseOffset = recordBatchDecoder.readInt64();
+        const batchLength = recordBatchDecoder.readInt32();
+
+        const batchDecoder = new Decoder(recordBatchDecoder.read(batchLength));
+
         const result = {
-            baseOffset: decoder.readInt64(),
-            batchLength: decoder.readInt32(),
-            partitionLeaderEpoch: decoder.readInt32(),
-            magic: decoder.readInt8(),
-            crc: decoder.readUInt32(),
-            attributes: decoder.readInt16(),
-            lastOffsetDelta: decoder.readInt32(),
-            baseTimestamp: decoder.readInt64(),
-            maxTimestamp: decoder.readInt64(),
-            producerId: decoder.readInt64(),
-            producerEpoch: decoder.readInt16(),
-            baseSequence: decoder.readInt32(),
+            baseOffset,
+            batchLength,
+            partitionLeaderEpoch: batchDecoder.readInt32(),
+            magic: batchDecoder.readInt8(),
+            crc: batchDecoder.readUInt32(),
+            attributes: batchDecoder.readInt16(),
+            lastOffsetDelta: batchDecoder.readInt32(),
+            baseTimestamp: batchDecoder.readInt64(),
+            maxTimestamp: batchDecoder.readInt64(),
+            producerId: batchDecoder.readInt64(),
+            producerEpoch: batchDecoder.readInt16(),
+            baseSequence: batchDecoder.readInt32(),
+            recordsLength: batchDecoder.read(4),
+            compressedRecords: batchDecoder.read(),
         };
+
         const compression = result.attributes & 0x07;
         const timestampType = (result.attributes & 0x08) >> 3 ? 'LogAppendTime' : 'CreateTime';
         const isTransactional = !!((result.attributes & 0x10) >> 4);
         const isControlBatch = !!((result.attributes & 0x20) >> 5);
         const hasDeleteHorizonMs = !!((result.attributes & 0x40) >> 6);
-        if (compression === 0) {
-            results.push({
-                ...result,
-                compression,
-                timestampType,
-                isTransactional,
-                isControlBatch,
-                hasDeleteHorizonMs,
-                records: decoder.readRecords((record) => ({
-                    attributes: record.readInt8(),
-                    timestampDelta: record.readVarLong(),
-                    offsetDelta: record.readVarInt(),
-                    key: record.readVarIntBuffer(),
-                    value: record.readVarIntBuffer(),
-                    headers: record.readVarIntArray((header) => ({
-                        key: header.readVarIntBuffer(),
-                        value: header.readVarIntBuffer(),
-                    })),
-                })),
-            });
-        } else {
-            throw new Error('Compression not supported yet');
-        }
+
+        results.push({
+            ...result,
+            compression,
+            timestampType,
+            isTransactional,
+            isControlBatch,
+            hasDeleteHorizonMs,
+        });
     }
     return results;
 };
+
+const decodeRecord = (decoder: Decoder) =>
+    decoder.readRecords((record) => ({
+        attributes: record.readInt8(),
+        timestampDelta: record.readVarLong(),
+        offsetDelta: record.readVarInt(),
+        key: record.readVarIntBuffer(),
+        value: record.readVarIntBuffer(),
+        headers: record.readVarIntArray((header) => ({
+            key: header.readVarIntBuffer(),
+            value: header.readVarIntBuffer(),
+        })),
+    }));
