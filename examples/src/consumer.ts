@@ -15,7 +15,7 @@ import { delay } from '../../dist/utils/delay';
             log.info(`Latency: ${Date.now() - parseInt(batch[0].timestamp.toString())}ms`)
         },
         batchGranularity: 'broker',
-        concurrency: 1,
+        concurrency: 10,
     });
 
     process.on('SIGINT', async () => {

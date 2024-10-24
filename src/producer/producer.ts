@@ -34,7 +34,7 @@ export class Producer {
         this.partition = this.options.partitioner({ metadata: this.metadata });
     }
 
-    public async send(messages: Message[]) {
+    public async send(messages: Message[], { acks = -1 }: { acks?: -1 | 0 | 1 } = {}) {
         await this.ensureConnected();
 
         const { allowTopicAutoCreation } = this.options;
@@ -44,7 +44,7 @@ export class Producer {
         await this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation });
 
         const nodeTopicPartitionMessages = distributeMessagesToTopicPartitionLeaders(
-            messages.map(message => ({ ...message, partition: this.partition(message) })),
+            messages.map((message) => ({ ...message, partition: this.partition(message) })),
             this.metadata.getTopicPartitionLeaderIds(),
         );
 
@@ -52,7 +52,7 @@ export class Producer {
             Object.entries(nodeTopicPartitionMessages).map(async ([nodeId, topicPartitionMessages]) => {
                 await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
                     transactionalId: null,
-                    acks: 1,
+                    acks,
                     timeoutMs: 5000,
                     topicData: Object.entries(topicPartitionMessages).map(([topic, partitionMessages]) => ({
                         name: topic,
