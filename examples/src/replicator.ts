@@ -1,3 +1,4 @@
+import { log } from 'kafka-ts';
 import { kafka } from './client';
 
 (async () => {
@@ -15,7 +16,7 @@ import { kafka } from './client';
                     offset: 0n,
                 })),
             );
-            console.log(`Replicated ${messages.length} messages`);
+            log.info(`Replicated ${messages.length} messages`);
         },
     });
     process.on('SIGINT', async () => {

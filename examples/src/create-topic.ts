@@ -1,4 +1,4 @@
-import { API, API_ERROR, KafkaTSApiError } from 'kafka-ts';
+import { API, API_ERROR, KafkaTSApiError, log } from 'kafka-ts';
 import { kafka } from './client';
 
 (async () => {
@@ -19,7 +19,7 @@ import { kafka } from './client';
                 {
                     name: 'my-topic',
                     numPartitions: 10,
-                    replicationFactor: 3,
+                    replicationFactor: 1,
                     assignments: [],
                     configs: [],
                 },
@@ -37,7 +37,7 @@ import { kafka } from './client';
         topics: [{ id: null, name: 'my-topic' }],
     });
 
-    console.log(metadata);
+    log.info('Metadata', metadata);
 
     await cluster.disconnect();
 })();

@@ -4,6 +4,7 @@ import { API } from './api';
 import { Broker, SASLProvider } from './broker';
 import { SendRequest } from './connection';
 import { ConnectionError, KafkaTSError } from './utils/error';
+import { log } from './utils/logger';
 
 type ClusterOptions = {
     clientId: string | null;
@@ -79,7 +80,7 @@ export class Cluster {
                 }).connect();
                 return;
             } catch (error) {
-                console.warn(`Failed to connect to seed broker ${options.host}:${options.port}`, error);
+                log.warn(`Failed to connect to seed broker ${options.host}:${options.port}`, error);
             }
         }
         throw new KafkaTSError('No seed brokers found');

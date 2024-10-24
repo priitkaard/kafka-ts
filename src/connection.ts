@@ -69,7 +69,7 @@ export class Connection {
         });
     }
 
-    @trace((api, body) => ({ apiName: getApiName(api), body }))
+    @trace((api, body) => ({ message: getApiName(api), body }))
     public async sendRequest<Request, Response>(api: Api<Request, Response>, body: Request): Promise<Response> {
         const correlationId = this.nextCorrelationId();
 

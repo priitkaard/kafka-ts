@@ -25,7 +25,9 @@ export class Processor extends EventEmitter<{ stop: []; stopped: [] }> {
         try {
             while (this.isRunning) {
                 const batch = await poll();
-                await process(batch);
+                if (batch.length) {
+                    await process(batch);
+                }
             }
         } finally {
             this.isRunning = false;

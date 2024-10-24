@@ -78,6 +78,7 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
         ]);
     }
 
+    @trace()
     public async poll(): Promise<Batch> {
         if (!this.isRunning) {
             return [];
@@ -85,6 +86,7 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
 
         const batch = this.queue.shift();
         if (!batch) {
+            // wait until new data is available or fetch manager is requested to stop
             await new Promise<void>((resolve) => {
                 const onData = () => {
                     this.removeListener('stop', onStop);
@@ -112,26 +114,31 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
         const { metadata, batchGranularity } = this.options;
 
         const batches = fetchResponseToBatches(response, batchGranularity, metadata);
-        if (batches.length) {
+        if (!batches.length) {
+            return;
+        }
+
+        // wait until all broker batches have been processed or fetch manager is requested to stop
+        await new Promise<void>((resolve) => {
+            const onCheckpoint = (id: number) => {
+                if (id === fetcherId) {
+                    this.removeListener('checkpoint', onCheckpoint);
+                    this.removeListener('stop', onStop);
+                    resolve();
+                }
+            };
+            const onStop = () => {
+                this.removeListener('checkpoint', onCheckpoint);
+                resolve();
+            };
+            this.on('checkpoint', onCheckpoint);
+            this.once('stop', onStop);
+
             this.queue.push(...batches);
             this.queue.push({ kind: 'checkpoint', fetcherId });
 
             this.emit('data');
-            await new Promise<void>((resolve) => {
-                const onCheckpoint = (id: number) => {
-                    if (id === fetcherId) {
-                        this.removeListener('stop', onStop);
-                        resolve();
-                    }
-                };
-                const onStop = () => {
-                    this.removeListener('checkpoint', onCheckpoint);
-                    resolve();
-                };
-                this.once('checkpoint', onCheckpoint);
-                this.once('stop', onStop);
-            });
-        }
+        });
     }
 }
 

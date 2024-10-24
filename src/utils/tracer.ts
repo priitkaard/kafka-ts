@@ -1,4 +1,4 @@
-import { serializer } from './debug';
+import { log } from './logger';
 
 export const createTracer =
     (module: string, attributes?: Record<string, unknown>) =>
@@ -12,9 +12,11 @@ export const createTracer =
             const metadata = fn?.(...args);
 
             const onEnd = <T>(result: T): T => {
-                console.log(
-                    `[${module}.${propertyKey}] +${Date.now() - startTime}ms ${JSON.stringify({ ...attributes, ...metadata, result }, serializer)}`,
-                );
+                log.debug(`[${module}.${propertyKey}] ${metadata?.message ?? ''} +${Date.now() - startTime}ms`, {
+                    ...attributes,
+                    ...metadata,
+                    ...result && { result},
+                });
                 return result;
             };
 

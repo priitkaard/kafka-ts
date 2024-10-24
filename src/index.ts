@@ -5,3 +5,5 @@ export * from './client';
 export * from './distributors/partitioner';
 export * from './types';
 export * from './utils/error';
+export * from './utils/logger';
+

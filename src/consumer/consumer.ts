@@ -6,10 +6,14 @@ import { distributeAssignmentsToNodes } from '../distributors/assignments-to-rep
 import { Message } from '../types';
 import { delay } from '../utils/delay';
 import { ConnectionError, KafkaTSApiError } from '../utils/error';
+import { log } from '../utils/logger';
+import { createTracer } from '../utils/tracer';
 import { ConsumerGroup } from './consumer-group';
 import { ConsumerMetadata } from './consumer-metadata';
 import { BatchGranularity, FetchManager } from './fetch-manager';
 import { OffsetManager } from './offset-manager';
+
+const trace = createTracer('Consumer');
 
 export type ConsumerOptions = {
     topics: string[];
@@ -91,8 +95,8 @@ export class Consumer {
             await this.offsetManager.fetchOffsets({ fromBeginning });
             await this.consumerGroup?.join();
         } catch (error) {
-            console.error(error);
-            console.debug(`Restarting consumer in 1 second...`);
+            log.error('Failed to start consumer', error);
+            log.debug(`Restarting consumer in 1 second...`);
             await delay(1000);
 
             if (this.stopHook) return (this.stopHook as () => void)();
@@ -101,6 +105,7 @@ export class Consumer {
         this.startFetchManager();
     }
 
+    @trace()
     public async close(force = false): Promise<void> {
         if (!force) {
             await new Promise<void>(async (resolve) => {
@@ -108,10 +113,8 @@ export class Consumer {
                 await this.fetchManager?.stop();
             });
         }
-        await this.consumerGroup
-            ?.leaveGroup()
-            .catch((error) => console.warn(`Failed to leave group: ${error.message}`));
-        await this.cluster.disconnect().catch((error) => console.warn(`Failed to disconnect: ${error.message}`));
+        await this.consumerGroup?.leaveGroup().catch((error) => log.warn(`Failed to leave group: ${error.message}`));
+        await this.cluster.disconnect().catch((error) => log.warn(`Failed to disconnect: ${error.message}`));
     }
 
     private startFetchManager = async () => {
@@ -142,7 +145,7 @@ export class Consumer {
                 await this.fetchManager.start();
 
                 if (!nodeAssignments.length) {
-                    console.debug('No partitions assigned. Waiting for reassignment...');
+                    log.debug('No partitions assigned. Waiting for reassignment...');
                     await delay(this.options.maxWaitMs);
                     await this.consumerGroup?.handleLastHeartbeat();
                 }
@@ -150,11 +153,11 @@ export class Consumer {
                 await this.fetchManager.stop();
 
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
-                    console.debug('Rebalance in progress...');
+                    log.debug('Rebalance in progress...');
                     continue;
                 }
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.FENCED_INSTANCE_ID) {
-                    console.debug('New consumer with the same groupInstanceId joined. Exiting the consumer...');
+                    log.debug('New consumer with the same groupInstanceId joined. Exiting the consumer...');
                     this.close();
                     break;
                 }
@@ -162,11 +165,11 @@ export class Consumer {
                     error instanceof ConnectionError ||
                     (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_COORDINATOR)
                 ) {
-                    console.debug(`${error.message}. Restarting consumer...`);
+                    log.debug(`${error.message}. Restarting consumer...`);
                     this.close().then(() => this.start());
                     break;
                 }
-                console.error(error);
+                log.error((error as Error).message, error);
                 this.close();
                 break;
             }
