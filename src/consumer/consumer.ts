@@ -177,6 +177,7 @@ export class Consumer {
         this.stopHook?.();
     };
 
+    @trace()
     private async process(messages: Required<Message>[]) {
         const { options } = this;
 

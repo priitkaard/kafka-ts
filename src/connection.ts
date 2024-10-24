@@ -59,6 +59,7 @@ export class Connection {
         });
     }
 
+    @trace()
     public disconnect() {
         this.socket.removeAllListeners();
         return new Promise<void>((resolve) => {

@@ -21,7 +21,8 @@ describe.sequential('Request handler', () => {
     let cluster: Cluster;
 
     beforeAll(async () => {
-        cluster = await kafka.createCluster().connect();
+        cluster = await kafka.createCluster();
+        await cluster.connect();
 
         const metadataResult = await cluster.sendRequest(API.METADATA, {
             topics: null,

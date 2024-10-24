@@ -30,6 +30,8 @@ export class ConsumerGroup {
 
     public async join() {
         await this.findCoordinator();
+        await this.options.cluster.setSeedBroker(this.coordinatorId);
+
         await this.joinGroup();
         await this.syncGroup();
         await this.offsetFetch();
@@ -70,7 +72,7 @@ export class ConsumerGroup {
     private async joinGroup(): Promise<void> {
         const { cluster, groupId, groupInstanceId, sessionTimeoutMs, rebalanceTimeoutMs, topics } = this.options;
         try {
-            const response = await cluster.sendRequestToNode(this.coordinatorId)(API.JOIN_GROUP, {
+            const response = await cluster.sendRequest(API.JOIN_GROUP, {
                 groupId,
                 groupInstanceId,
                 memberId: this.memberId,
@@ -113,7 +115,7 @@ export class ConsumerGroup {
             assignments = Object.entries(memberAssignments).map(([memberId, assignment]) => ({ memberId, assignment }));
         }
 
-        const response = await cluster.sendRequestToNode(this.coordinatorId)(API.SYNC_GROUP, {
+        const response = await cluster.sendRequest(API.SYNC_GROUP, {
             groupId,
             groupInstanceId,
             memberId: this.memberId,
@@ -144,7 +146,7 @@ export class ConsumerGroup {
         };
         if (!request.groups.length) return;
 
-        const response = await cluster.sendRequestToNode(this.coordinatorId)(API.OFFSET_FETCH, request);
+        const response = await cluster.sendRequest(API.OFFSET_FETCH, request);
         response.groups.forEach((group) => {
             group.topics.forEach((topic) => {
                 topic.partitions
@@ -177,13 +179,13 @@ export class ConsumerGroup {
         if (!request.topics.length) {
             return;
         }
-        await cluster.sendRequestToNode(this.coordinatorId)(API.OFFSET_COMMIT, request);
+        await cluster.sendRequest(API.OFFSET_COMMIT, request);
         offsetManager.flush();
     }
 
     public async heartbeat() {
         const { cluster, groupId, groupInstanceId } = this.options;
-        await cluster.sendRequestToNode(this.coordinatorId)(API.HEARTBEAT, {
+        await cluster.sendRequest(API.HEARTBEAT, {
             groupId,
             groupInstanceId,
             memberId: this.memberId,
@@ -195,7 +197,7 @@ export class ConsumerGroup {
         const { cluster, groupId, groupInstanceId } = this.options;
         this.stopHeartbeater();
         try {
-            await cluster.sendRequestToNode(this.coordinatorId)(API.LEAVE_GROUP, {
+            await cluster.sendRequest(API.LEAVE_GROUP, {
                 groupId,
                 members: [{ memberId: this.memberId, groupInstanceId, reason: null }],
             });

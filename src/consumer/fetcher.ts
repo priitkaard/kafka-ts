@@ -26,10 +26,10 @@ export class Fetcher extends EventEmitter<{ stop: []; stopped: []; data: []; dra
 
     public async loop() {
         const { nodeId, assignment, consumerGroup, fetch, onResponse } = this.options;
-
+        
         this.isRunning = true;
         this.once('stop', () => (this.isRunning = false));
-
+        
         try {
             while (this.isRunning) {
                 const response = await fetch(nodeId, assignment);
