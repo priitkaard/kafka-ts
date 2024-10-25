@@ -17,17 +17,12 @@ export class Processor extends EventEmitter<{ stop: []; stopped: [] }> {
     }
 
     public async loop() {
-        const { poll, process } = this.options;
-
         this.isRunning = true;
         this.once('stop', () => (this.isRunning = false));
 
         try {
             while (this.isRunning) {
-                const batch = await poll();
-                if (batch.length) {
-                    await process(batch);
-                }
+                await this.step();
             }
         } finally {
             this.isRunning = false;
@@ -35,7 +30,16 @@ export class Processor extends EventEmitter<{ stop: []; stopped: [] }> {
         }
     }
 
-    @trace()
+    @trace(() => ({ root: true }))
+    private async step() {
+        const { poll, process } = this.options;
+
+        const batch = await poll();
+        if (batch.length) {
+            await process(batch);
+        }
+    }
+
     public async stop() {
         if (!this.isRunning) {
             return;

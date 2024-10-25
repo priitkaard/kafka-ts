@@ -6,6 +6,7 @@ import { Api } from './utils/api';
 import { Decoder } from './utils/decoder';
 import { Encoder } from './utils/encoder';
 import { ConnectionError } from './utils/error';
+import { log } from './utils/logger';
 import { createTracer } from './utils/tracer';
 
 const trace = createTracer('Connection');
@@ -129,10 +130,13 @@ export class Connection {
 
         const correlationId = decoder.readInt32();
 
-        const { resolve } = this.queue[correlationId];
-        delete this.queue[correlationId];
-
-        resolve({ responseDecoder: decoder, responseSize: size });
+        const context = this.queue[correlationId];
+        if (context) {
+            delete this.queue[correlationId];
+            context.resolve({ responseDecoder: decoder, responseSize: size });
+        } else {
+            log.debug('Could not find pending request for correlationId', { correlationId });
+        }
         this.buffer = null;
     }
 

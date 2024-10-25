@@ -83,6 +83,7 @@ export class Consumer {
             : undefined;
     }
 
+    @trace()
     public async start(): Promise<void> {
         const { topics, allowTopicAutoCreation, fromBeginning } = this.options;
 
@@ -117,7 +118,7 @@ export class Consumer {
         await this.cluster.disconnect().catch((error) => log.warn(`Failed to disconnect: ${error.message}`));
     }
 
-    private startFetchManager = async () => {
+    private async startFetchManager() {
         const { batchGranularity, concurrency } = this.options;
 
         while (!this.stopHook) {
@@ -186,9 +187,9 @@ export class Consumer {
             }
         }
         this.stopHook?.();
-    };
+    }
 
-    @trace()
+    @trace(messages => ({ count: messages.length }))
     private async process(messages: Required<Message>[]) {
         const { options } = this;
 

@@ -138,9 +138,12 @@ const decodeRecordBatch = (decoder: Decoder) => {
     const recordBatchDecoder = new Decoder(decoder.read(size));
 
     const results = [];
-    while (recordBatchDecoder.getBufferLength() > recordBatchDecoder.getOffset()) {
+    while (recordBatchDecoder.getBufferLength() > recordBatchDecoder.getOffset() + 12) {
         const baseOffset = recordBatchDecoder.readInt64();
         const batchLength = recordBatchDecoder.readInt32();
+        if (!batchLength) {
+            continue;
+        }
 
         const batchDecoder = new Decoder(recordBatchDecoder.read(batchLength));
 

@@ -24,18 +24,13 @@ export class Fetcher extends EventEmitter<{ stop: []; stopped: []; data: []; dra
         super();
     }
 
-    public async loop() {
-        const { nodeId, assignment, consumerGroup, fetch, onResponse } = this.options;
-        
+    public async loop() {        
         this.isRunning = true;
         this.once('stop', () => (this.isRunning = false));
         
         try {
             while (this.isRunning) {
-                const response = await fetch(nodeId, assignment);
-                await consumerGroup?.handleLastHeartbeat();
-                await onResponse(this.fetcherId, response);
-                await consumerGroup?.handleLastHeartbeat();
+                await this.step();
             }
         } finally {
             this.isRunning = false;
@@ -43,7 +38,16 @@ export class Fetcher extends EventEmitter<{ stop: []; stopped: []; data: []; dra
         }
     }
 
-    @trace()
+    @trace(() => ({ root: true }))
+    private async step() {
+        const { nodeId, assignment, consumerGroup, fetch, onResponse } = this.options;
+
+        const response = await fetch(nodeId, assignment);
+        await consumerGroup?.handleLastHeartbeat();
+        await onResponse(this.fetcherId, response);
+        await consumerGroup?.handleLastHeartbeat();
+    }
+
     public async stop() {
         if (!this.isRunning) {
             return;

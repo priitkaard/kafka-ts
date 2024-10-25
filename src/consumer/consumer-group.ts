@@ -3,8 +3,11 @@ import { KEY_TYPE } from '../api/find-coordinator';
 import { Assignment, MemberAssignment } from '../api/sync-group';
 import { Cluster } from '../cluster';
 import { KafkaTSApiError, KafkaTSError } from '../utils/error';
+import { createTracer } from '../utils/tracer';
 import { ConsumerMetadata } from './consumer-metadata';
 import { OffsetManager } from './offset-manager';
+
+const trace = createTracer('ConsumerGroup');
 
 type ConsumerGroupOptions = {
     cluster: Cluster;
@@ -28,6 +31,7 @@ export class ConsumerGroup {
 
     constructor(private options: ConsumerGroupOptions) {}
 
+    @trace()
     public async join() {
         await this.findCoordinator();
         await this.options.cluster.setSeedBroker(this.coordinatorId);

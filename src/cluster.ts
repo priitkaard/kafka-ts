@@ -15,7 +15,7 @@ type ClusterOptions = {
 
 export class Cluster {
     private seedBroker = new Broker({ clientId: null, sasl: null, ssl: null, options: { port: 9092 } });
-    private brokers: { nodeId: number; broker: Broker }[] = [];
+    private brokerById: Record<number, Broker> = {};
     private brokerMetadata: Record<number, Awaited<ReturnType<(typeof API.METADATA)['response']>>['brokers'][number]> =
         {};
 
@@ -33,11 +33,11 @@ export class Cluster {
     }
 
     public async disconnect() {
-        await Promise.all(this.brokers.map((x) => x.broker.disconnect()));
+        await Promise.all([this.seedBroker.disconnect(), ...Object.values(this.brokerById).map((x) => x.disconnect())]);
     }
 
     public setSeedBroker = async (nodeId: number) => {
-        await this.releaseBroker(this.seedBroker);
+        await this.seedBroker.disconnect();
         this.seedBroker = await this.acquireBroker(nodeId);
     };
 
@@ -46,11 +46,10 @@ export class Cluster {
     public sendRequestToNode =
         (nodeId: number): SendRequest =>
         async (...args) => {
-            let broker = this.brokers.find((x) => x.nodeId === nodeId)?.broker;
-            if (!broker) {
-                broker = await this.acquireBroker(nodeId);
+            if (!this.brokerById[nodeId]) {
+                this.brokerById[nodeId] = await this.acquireBroker(nodeId);
             }
-            return broker.sendRequest(...args);
+            return this.brokerById[nodeId].sendRequest(...args);
         };
 
     public async acquireBroker(nodeId: number) {
@@ -60,15 +59,9 @@ export class Cluster {
             ssl: this.options.ssl,
             options: this.brokerMetadata[nodeId],
         });
-        this.brokers.push({ nodeId, broker });
         await broker.connect();
         return broker;
     }
-
-    public async releaseBroker(broker: Broker) {
-        await broker.disconnect();
-        this.brokers = this.brokers.filter((x) => x.broker !== broker);
-    };
 
     private async findSeedBroker() {
         const randomizedBrokers = this.options.bootstrapServers.toSorted(() => Math.random() - 0.5);
@@ -81,7 +74,6 @@ export class Cluster {
                     options,
                 });
                 await broker.connect();
-                this.brokers.push({ nodeId: -1, broker });
                 return broker;
             } catch (error) {
                 log.warn(`Failed to connect to seed broker ${options.host}:${options.port}`, error);

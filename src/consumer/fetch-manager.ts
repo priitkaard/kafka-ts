@@ -50,8 +50,10 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
         this.processors = Array.from({ length: concurrency }).map(
             () => new Processor({ process, poll: this.poll.bind(this) }),
         );
+        this.setMaxListeners(concurrency * 2);
     }
 
+    @trace()
     public async start() {
         this.queue = [];
         this.isRunning = true;
@@ -67,7 +69,6 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
         }
     }
 
-    @trace()
     public async stop() {
         this.isRunning = false;
         this.emit('stop');
@@ -110,6 +111,7 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
         return batch as Exclude<Entry, Checkpoint>;
     }
 
+    @trace()
     private async onResponse(fetcherId: number, response: Awaited<ReturnType<(typeof API.FETCH)['response']>>) {
         const { metadata, batchGranularity } = this.options;
 
