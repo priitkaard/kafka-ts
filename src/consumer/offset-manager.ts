@@ -3,7 +3,10 @@ import { IsolationLevel } from '../api/fetch';
 import { Assignment } from '../api/sync-group';
 import { Cluster } from '../cluster';
 import { distributeMessagesToTopicPartitionLeaders } from '../distributors/messages-to-topic-partition-leaders';
+import { createTracer } from '../utils/tracer';
 import { ConsumerMetadata } from './consumer-metadata';
+
+const trace = createTracer('OffsetManager');
 
 type OffsetManagerOptions = {
     cluster: Cluster;
@@ -21,6 +24,7 @@ export class OffsetManager {
         return this.currentOffsets[topic]?.[partition] ?? 0n;
     }
 
+    @trace()
     public resolve(topic: string, partition: number, offset: bigint) {
         this.pendingOffsets[topic] ??= {};
         this.pendingOffsets[topic][partition] = offset;

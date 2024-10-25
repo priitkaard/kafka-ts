@@ -23,6 +23,7 @@ export class Cluster {
 
     public async connect() {
         this.seedBroker = await this.findSeedBroker();
+        this.brokerById = {};
 
         const metadata = await this.sendRequest(API.METADATA, {
             allowTopicAutoCreation: false,
