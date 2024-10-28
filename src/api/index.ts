@@ -37,7 +37,9 @@ export const API = {
     SYNC_GROUP,
 };
 
-export const getApiName = (api: Api<unknown, unknown>) => Object.entries(API).find(([, v]) => v === api)?.[0];
+const apiNameByKey = Object.fromEntries(Object.entries(API).map(([k, v]) => [v.apiKey, k]));
+
+export const getApiName = <Request, Response>(api: Api<Request, Response>) => apiNameByKey[api.apiKey];
 
 export const API_ERROR = {
     UNKNOWN_SERVER_ERROR: -1,

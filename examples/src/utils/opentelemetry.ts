@@ -15,12 +15,7 @@ const exporter = new JaegerExporter({ port: 6832, host: 'localhost', maxPacketSi
 const sdk = new NodeSDK({
     serviceName: 'kafka-ts',
     traceExporter: exporter,
-    spanProcessors: [
-        new BatchSpanProcessor(exporter, {
-            maxQueueSize: 1000,
-            scheduledDelayMillis: 5000,
-        }),
-    ],
+    spanProcessors: [new BatchSpanProcessor(exporter, { maxQueueSize: 128, maxExportBatchSize: 128 })],
     instrumentations: [getNodeAutoInstrumentations()],
 });
 

@@ -1,41 +1,49 @@
 export class Encoder {
-    private buffer: Buffer;
+    private chunks: Buffer[] = [];
 
-    constructor({ buffer = Buffer.alloc(0) }: { buffer?: Buffer } = {}) {
-        this.buffer = buffer;
+    public getChunks() {
+        return this.chunks;
     }
 
-    public write(rightBuffer: Buffer) {
-        this.buffer = Buffer.concat([this.buffer, rightBuffer]);
+    public getByteLength() {
+        return this.chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+    }
+
+    public write(...buffers: Buffer[]) {
+        this.chunks.push(...buffers);
         return this;
     }
 
+    public writeEncoder(encoder: Encoder) {
+        return this.write(...encoder.getChunks());
+    }
+
     public writeInt8(value: number) {
-        const buffer = Buffer.alloc(1);
+        const buffer = Buffer.allocUnsafe(1);
         buffer.writeInt8(value);
         return this.write(buffer);
     }
 
     public writeInt16(value: number) {
-        const buffer = Buffer.alloc(2);
+        const buffer = Buffer.allocUnsafe(2);
         buffer.writeInt16BE(value);
         return this.write(buffer);
     }
 
     public writeInt32(value: number) {
-        const buffer = Buffer.alloc(4);
+        const buffer = Buffer.allocUnsafe(4);
         buffer.writeInt32BE(value);
         return this.write(buffer);
     }
 
     public writeUInt32(value: number) {
-        const buffer = Buffer.alloc(4);
+        const buffer = Buffer.allocUnsafe(4);
         buffer.writeUInt32BE(value);
         return this.write(buffer);
     }
 
     public writeInt64(value: bigint) {
-        const buffer = Buffer.alloc(8);
+        const buffer = Buffer.allocUnsafe(8);
         buffer.writeBigInt64BE(value);
         return this.write(buffer);
     }
@@ -75,7 +83,7 @@ export class Encoder {
             return this.writeInt16(-1);
         }
         const byteLength = Buffer.byteLength(value, 'utf-8');
-        const buffer = Buffer.alloc(byteLength);
+        const buffer = Buffer.allocUnsafe(byteLength);
         buffer.write(value, 0, byteLength, 'utf-8');
         return this.writeInt16(byteLength).write(buffer);
     }
@@ -86,7 +94,7 @@ export class Encoder {
         }
 
         const byteLength = Buffer.byteLength(value, 'utf-8');
-        const buffer = Buffer.alloc(byteLength);
+        const buffer = Buffer.allocUnsafe(byteLength);
         buffer.write(value, 0, byteLength, 'utf-8');
         return this.writeUVarInt(byteLength + 1).write(buffer);
     }
@@ -110,21 +118,20 @@ export class Encoder {
     }
 
     public writeArray<T>(arr: T[], callback: (encoder: Encoder, item: T) => Encoder) {
-        const buffers = arr.map((item) => callback(new Encoder(), item).value());
-        return this.writeInt32(arr.length).write(Buffer.concat(buffers));
+        return this.writeInt32(arr.length).write(...arr.flatMap((item) => callback(new Encoder(), item).getChunks()));
     }
 
     public writeCompactArray<T>(arr: T[] | null, callback: (encoder: Encoder, item: T) => Encoder) {
         if (arr === null) {
             return this.writeUVarInt(0);
         }
-        const buffers = arr.map((item) => callback(new Encoder(), item).value());
-        return this.writeUVarInt(buffers.length + 1).write(Buffer.concat(buffers));
+        return this.writeUVarInt(arr.length + 1).write(
+            ...arr.flatMap((item) => callback(new Encoder(), item).getChunks()),
+        );
     }
 
     public writeVarIntArray<T>(arr: T[], callback: (encoder: Encoder, item: T) => Encoder) {
-        const buffers = arr.map((item) => callback(new Encoder(), item).value());
-        return this.writeVarInt(buffers.length).write(Buffer.concat(buffers));
+        return this.writeVarInt(arr.length).write(...arr.flatMap((item) => callback(new Encoder(), item).getChunks()));
     }
 
     public writeBytes(value: Buffer) {
@@ -136,6 +143,6 @@ export class Encoder {
     }
 
     public value() {
-        return this.buffer;
+        return Buffer.concat(this.chunks);
     }
 }

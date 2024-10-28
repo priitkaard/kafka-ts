@@ -1,4 +1,3 @@
-import EventEmitter from 'events';
 import { API } from '../api';
 import { Assignment } from '../api/sync-group';
 import { Metadata } from '../metadata';
@@ -26,15 +25,15 @@ type FetchManagerOptions = {
 type Checkpoint = { kind: 'checkpoint'; fetcherId: number };
 type Entry = Batch | Checkpoint;
 
-export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number]; stop: [] }> {
+export class FetchManager {
     private queue: Entry[] = [];
     private isRunning = false;
     private fetchers: Fetcher[];
     private processors: Processor[];
+    private pollQueue: (() => void)[] = [];
+    private fetcherCallbacks: Record<number, () => void> = {};
 
     constructor(private options: FetchManagerOptions) {
-        super();
-
         const { fetch, process, consumerGroup, nodeAssignments, concurrency } = this.options;
 
         this.fetchers = nodeAssignments.map(
@@ -50,10 +49,9 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
         this.processors = Array.from({ length: concurrency }).map(
             () => new Processor({ process, poll: this.poll.bind(this) }),
         );
-        this.setMaxListeners(concurrency * 2);
     }
 
-    @trace()
+    @trace(() => ({ root: true }))
     public async start() {
         this.queue = [];
         this.isRunning = true;
@@ -64,19 +62,25 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
                 ...this.processors.map((processor) => processor.loop()),
             ]);
         } finally {
-            this.isRunning = false;
-            this.emit('stop');
+            await this.stop();
         }
     }
 
     public async stop() {
         this.isRunning = false;
-        this.emit('stop');
 
-        await Promise.all([
+        const stopPromise = Promise.all([
             ...this.fetchers.map((fetcher) => fetcher.stop()),
             ...this.processors.map((processor) => processor.stop()),
         ]);
+
+        this.pollQueue.forEach((resolve) => resolve());
+        this.pollQueue = [];
+
+        Object.values(this.fetcherCallbacks).forEach((callback) => callback());
+        this.fetcherCallbacks = {};
+
+        await stopPromise;
     }
 
     @trace()
@@ -89,24 +93,17 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
         if (!batch) {
             // wait until new data is available or fetch manager is requested to stop
             await new Promise<void>((resolve) => {
-                const onData = () => {
-                    this.removeListener('stop', onStop);
-                    resolve();
-                };
-                const onStop = () => {
-                    this.removeListener('data', onData);
-                    resolve();
-                };
-                this.once('data', onData);
-                this.once('stop', onStop);
+                this.pollQueue.push(resolve);
             });
             return this.poll();
         }
 
         if ('kind' in batch && batch.kind === 'checkpoint') {
-            this.emit('checkpoint', batch.fetcherId);
+            this.fetcherCallbacks[batch.fetcherId]?.();
             return this.poll();
         }
+
+        this.pollQueue?.shift()?.();
 
         return batch as Exclude<Entry, Checkpoint>;
     }
@@ -122,24 +119,9 @@ export class FetchManager extends EventEmitter<{ data: []; checkpoint: [number];
 
         // wait until all broker batches have been processed or fetch manager is requested to stop
         await new Promise<void>((resolve) => {
-            const onCheckpoint = (id: number) => {
-                if (id === fetcherId) {
-                    this.removeListener('checkpoint', onCheckpoint);
-                    this.removeListener('stop', onStop);
-                    resolve();
-                }
-            };
-            const onStop = () => {
-                this.removeListener('checkpoint', onCheckpoint);
-                resolve();
-            };
-            this.on('checkpoint', onCheckpoint);
-            this.once('stop', onStop);
-
-            this.queue.push(...batches);
-            this.queue.push({ kind: 'checkpoint', fetcherId });
-
-            this.emit('data');
+            this.fetcherCallbacks[fetcherId] = resolve;
+            this.queue.push(...batches, { kind: 'checkpoint', fetcherId });
+            this.pollQueue?.shift()?.();
         });
     }
 }
@@ -178,9 +160,9 @@ const fetchResponseToBatches = (
                 .map((topicPartition) => topicPartition.flatMap((partitionMessages) => partitionMessages))
                 .filter((messages) => messages.length);
         case 'partition':
-            return brokerTopics.flatMap((topicPartition) =>
-                topicPartition.map((partitionMessages) => partitionMessages),
-            );
+            return brokerTopics
+                .flatMap((topicPartition) => topicPartition.map((partitionMessages) => partitionMessages))
+                .filter((messages) => messages.length);
         default:
             throw new KafkaTSError(`Unhandled batch granularity: ${batchGranularity}`);
     }

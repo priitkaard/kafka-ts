@@ -65,10 +65,9 @@ export const PRODUCE = createApi({
                                     .writeVarIntBuffer(record.value)
                                     .writeVarIntArray(record.headers, (encoder, header) =>
                                         encoder.writeVarIntBuffer(header.key).writeVarIntBuffer(header.value),
-                                    )
-                                    .value();
+                                    );
 
-                                return encoder.writeVarInt(recordBody.length).write(recordBody);
+                                return encoder.writeVarInt(recordBody.getByteLength()).writeEncoder(recordBody);
                             })
                             .value();
 
@@ -76,19 +75,17 @@ export const PRODUCE = createApi({
                             .writeInt32(partition.partitionLeaderEpoch)
                             .writeInt8(2) // magic byte
                             .writeUInt32(unsigned(crc32C(batchBody)))
-                            .write(batchBody)
-                            .value();
+                            .write(batchBody);
 
                         const batch = new Encoder()
                             .writeInt64(partition.baseOffset)
-                            .writeInt32(batchHeader.length)
-                            .write(batchHeader)
-                            .value();
+                            .writeInt32(batchHeader.getByteLength())
+                            .writeEncoder(batchHeader);
 
                         return encoder
                             .writeInt32(partition.index)
-                            .writeUVarInt(batch.length + 1) // batch size
-                            .write(batch)
+                            .writeUVarInt(batch.getByteLength() + 1) // batch size
+                            .writeEncoder(batch)
                             .writeUVarInt(0);
                     })
                     .writeUVarInt(0),

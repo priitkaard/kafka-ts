@@ -5,16 +5,20 @@ export interface Tracer {
 }
 
 class DebugTracer implements Tracer {
+    private isEnabled = process.env.DEBUG?.includes('kafka-ts');
+
     startActiveSpan<T>(module: string, method: string, metadata: Record<string, unknown>, callback: () => T): T {
+        if (!this.isEnabled) {
+            return callback();
+        }
+
         const startTime = Date.now();
 
         const onEnd = <T>(result: T): T => {
-            if (process.env.DEBUG?.includes('kafka-ts')) {
-                log.debug(`[${module}.${method}] ${metadata?.message ?? ''} +${Date.now() - startTime}ms`, {
-                    ...metadata,
-                    ...(!!result && { result }),
-                });
-            }
+            log.debug(`[${module}.${method}] ${metadata?.message ?? ''} +${Date.now() - startTime}ms`, {
+                ...metadata,
+                ...(!!result && { result }),
+            });
             return result;
         };
 

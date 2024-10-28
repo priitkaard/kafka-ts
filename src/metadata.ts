@@ -2,6 +2,9 @@ import { API, API_ERROR } from './api';
 import { Cluster } from './cluster';
 import { delay } from './utils/delay';
 import { KafkaTSApiError } from './utils/error';
+import { createTracer } from './utils/tracer';
+
+const trace = createTracer('Metadata');
 
 type MetadataOptions = {
     cluster: Cluster;
@@ -36,6 +39,7 @@ export class Metadata {
         return this.topicNameById[id];
     }
 
+    @trace()
     public async fetchMetadataIfNecessary({
         topics,
         allowTopicAutoCreation,

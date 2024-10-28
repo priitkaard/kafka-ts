@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import { API, API_ERROR } from '../api';
 import { IsolationLevel } from '../api/fetch';
 import { Assignment } from '../api/sync-group';
@@ -33,7 +34,7 @@ export type ConsumerOptions = {
     concurrency?: number;
 } & ({ onBatch: (messages: Required<Message>[]) => unknown } | { onMessage: (message: Required<Message>) => unknown });
 
-export class Consumer {
+export class Consumer extends EventEmitter<{ offsetCommit: [] }> {
     private options: Required<ConsumerOptions>;
     private metadata: ConsumerMetadata;
     private consumerGroup: ConsumerGroup | undefined;
@@ -45,6 +46,8 @@ export class Consumer {
         private cluster: Cluster,
         options: ConsumerOptions,
     ) {
+        super();
+
         this.options = {
             ...options,
             groupId: options.groupId ?? null,
@@ -81,6 +84,7 @@ export class Consumer {
                   offsetManager: this.offsetManager,
               })
             : undefined;
+        this.consumerGroup?.on('offsetCommit', () => this.emit('offsetCommit'));
     }
 
     @trace()
@@ -96,7 +100,7 @@ export class Consumer {
             await this.offsetManager.fetchOffsets({ fromBeginning });
             await this.consumerGroup?.join();
         } catch (error) {
-            log.error('Failed to start consumer', error);
+            log.warn('Failed to start consumer', error);
             log.debug(`Restarting consumer in 1 second...`);
             await delay(1000);
 
@@ -114,14 +118,16 @@ export class Consumer {
                 await this.fetchManager?.stop();
             });
         }
-        await this.consumerGroup?.leaveGroup().catch((error) => log.warn(`Failed to leave group: ${error.message}`));
-        await this.cluster.disconnect().catch((error) => log.warn(`Failed to disconnect: ${error.message}`));
+        await this.consumerGroup?.leaveGroup().catch((error) => log.debug(`Failed to leave group: ${error.message}`));
+        await this.cluster.disconnect().catch((error) => log.debug(`Failed to disconnect: ${error.message}`));
     }
 
     private async startFetchManager() {
         const { batchGranularity, concurrency } = this.options;
 
         while (!this.stopHook) {
+            this.consumerGroup?.resetHeartbeat();
+
             // TODO: If leader is not available, find another read replica
             const nodeAssignments = Object.entries(
                 distributeMessagesToTopicPartitionLeaders(
@@ -159,7 +165,7 @@ export class Consumer {
                 if (!nodeAssignments.length) {
                     log.debug('No partitions assigned. Waiting for reassignment...');
                     await delay(this.options.maxWaitMs);
-                    await this.consumerGroup?.handleLastHeartbeat();
+                    this.consumerGroup?.handleLastHeartbeat();
                 }
             } catch (error) {
                 await this.fetchManager.stop();
@@ -189,9 +195,15 @@ export class Consumer {
         this.stopHook?.();
     }
 
-    @trace(messages => ({ count: messages.length }))
+    @trace((messages) => ({ count: messages.length }))
     private async process(messages: Required<Message>[]) {
         const { options } = this;
+
+        const topicPartitions: Record<string, Set<number>> = {};
+        for (const { topic, partition } of messages) {
+            topicPartitions[topic] ??= new Set();
+            topicPartitions[topic].add(partition);
+        }
 
         if ('onBatch' in options) {
             await options.onBatch(messages);
@@ -200,19 +212,16 @@ export class Consumer {
                 this.offsetManager.resolve(topic, partition, offset + 1n),
             );
         } else if ('onMessage' in options) {
-            try {
-                for (const message of messages) {
-                    await options.onMessage(message);
+            for (const message of messages) {
+                await options.onMessage(message);
 
-                    const { topic, partition, offset } = message;
-                    this.offsetManager.resolve(topic, partition, offset + 1n);
-                }
-            } catch (error) {
-                await this.consumerGroup?.offsetCommit().catch(() => {});
-                throw error;
+                const { topic, partition, offset } = message;
+                this.offsetManager.resolve(topic, partition, offset + 1n);
             }
         }
-        await this.consumerGroup?.offsetCommit();
+
+        await this.consumerGroup?.offsetCommit(topicPartitions);
+        this.offsetManager.flush(topicPartitions);
     }
 
     private fetch(nodeId: number, assignment: Assignment) {

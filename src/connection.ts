@@ -25,14 +25,14 @@ export class Connection {
         [correlationId: number]: { resolve: (response: RawResonse) => void; reject: (error: Error) => void };
     } = {};
     private lastCorrelationId = 0;
-    private buffer: Buffer | null = null;
+    private chunks: Buffer[] = [];
 
     constructor(private options: ConnectionOptions) {}
 
     @trace()
     public async connect() {
         this.queue = {};
-        this.buffer = null;
+        this.chunks = [];
 
         await new Promise<void>((resolve, reject) => {
             const { ssl, connection } = this.options;
@@ -74,6 +74,7 @@ export class Connection {
     @trace((api, body) => ({ message: getApiName(api), body }))
     public async sendRequest<Request, Response>(api: Api<Request, Response>, body: Request): Promise<Response> {
         const correlationId = this.nextCorrelationId();
+        const apiName = getApiName(api);
 
         const encoder = new Encoder()
             .writeInt16(api.apiKey)
@@ -81,17 +82,24 @@ export class Connection {
             .writeInt32(correlationId)
             .writeString(this.options.clientId);
 
-        const request = api.request(encoder, body).value();
-        const requestEncoder = new Encoder().writeInt32(request.length).write(request);
+        const request = api.request(encoder, body);
+        const requestEncoder = new Encoder().writeInt32(request.getByteLength()).writeEncoder(request);
 
+        let timeout: NodeJS.Timeout | undefined;
         const { responseDecoder, responseSize } = await new Promise<RawResonse>(async (resolve, reject) => {
+            timeout = setTimeout(() => {
+                delete this.queue[correlationId];
+                reject(new ConnectionError(`${apiName} timed out`));
+            }, 30_000);
+
             try {
-                await this.write(requestEncoder.value());
                 this.queue[correlationId] = { resolve, reject };
+                await this.write(requestEncoder.value());
             } catch (error) {
                 reject(error);
             }
         });
+        clearTimeout(timeout);
         const response = await api.response(responseDecoder);
 
         assert(
@@ -117,12 +125,13 @@ export class Connection {
     }
 
     private handleData(buffer: Buffer) {
-        this.buffer = this.buffer ? Buffer.concat([this.buffer, buffer]) : buffer;
-        if (this.buffer.length < 4) {
+        this.chunks.push(buffer);
+
+        const decoder = new Decoder(Buffer.concat(this.chunks));
+        if (decoder.getBufferLength() < 4) {
             return;
         }
 
-        const decoder = new Decoder(this.buffer);
         const size = decoder.readInt32();
         if (size !== decoder.getBufferLength() - 4) {
             return;
@@ -137,11 +146,11 @@ export class Connection {
         } else {
             log.debug('Could not find pending request for correlationId', { correlationId });
         }
-        this.buffer = null;
+        this.chunks = [];
     }
 
     private nextCorrelationId() {
-        return (this.lastCorrelationId = (this.lastCorrelationId + 1) % 2 ** 31);
+        return this.lastCorrelationId++;
     }
 }
 

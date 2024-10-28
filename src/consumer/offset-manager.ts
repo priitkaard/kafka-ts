@@ -24,17 +24,21 @@ export class OffsetManager {
         return this.currentOffsets[topic]?.[partition] ?? 0n;
     }
 
-    @trace()
     public resolve(topic: string, partition: number, offset: bigint) {
         this.pendingOffsets[topic] ??= {};
         this.pendingOffsets[topic][partition] = offset;
-
-        this.currentOffsets[topic] ??= {};
-        this.currentOffsets[topic][partition] = offset;
     }
 
-    public flush() {
-        this.pendingOffsets = {};
+    public flush(topicPartitions: Record<string, Set<number>>) {
+        Object.entries(topicPartitions).forEach(([topic, partitions]) => {
+            this.currentOffsets[topic] ??= {};
+            partitions.forEach((partition) => {
+                if (this.pendingOffsets[topic]?.[partition]) {
+                    this.currentOffsets[topic][partition] = this.pendingOffsets[topic][partition];
+                    delete this.pendingOffsets[topic][partition];
+                }
+            });
+        });
     }
 
     public async fetchOffsets(options: { fromBeginning: boolean }) {
@@ -62,7 +66,6 @@ export class OffsetManager {
                 }),
             ),
         );
-        this.flush();
     }
 
     private async listOffsets({
@@ -87,11 +90,15 @@ export class OffsetManager {
                 })),
         });
 
+        const topicPartitions: Record<string, Set<number>> = {};
         offsets.topics.forEach(({ name, partitions }) => {
+            topicPartitions[name] ??= new Set();
             partitions.forEach(({ partitionIndex, offset }) => {
+                topicPartitions[name].add(partitionIndex);
                 this.resolve(name, partitionIndex, fromBeginning ? 0n : offset);
             });
         });
-        this.flush();
+
+        this.flush(topicPartitions);
     }
 }

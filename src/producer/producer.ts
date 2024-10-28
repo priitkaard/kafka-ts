@@ -7,6 +7,9 @@ import { Message } from '../types';
 import { delay } from '../utils/delay';
 import { KafkaTSApiError } from '../utils/error';
 import { memo } from '../utils/memo';
+import { createTracer } from '../utils/tracer';
+
+const trace = createTracer('Producer');
 
 export type ProducerOptions = {
     allowTopicAutoCreation?: boolean;
@@ -34,6 +37,7 @@ export class Producer {
         this.partition = this.options.partitioner({ metadata: this.metadata });
     }
 
+    @trace(() => ({ root: true }))
     public async send(messages: Message[], { acks = -1 }: { acks?: -1 | 1 } = {}) {
         await this.ensureConnected();
 
@@ -49,14 +53,15 @@ export class Producer {
         );
 
         await Promise.all(
-            Object.entries(nodeTopicPartitionMessages).map(async ([nodeId, topicPartitionMessages]) => {
-                await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
+            Object.entries(nodeTopicPartitionMessages).map(([nodeId, topicPartitionMessages]) =>
+                this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
                     transactionalId: null,
                     acks,
                     timeoutMs: 5000,
                     topicData: Object.entries(topicPartitionMessages).map(([topic, partitionMessages]) => ({
                         name: topic,
                         partitionData: Object.entries(partitionMessages).map(([partition, messages]) => {
+                            const partitionIndex = parseInt(partition);
                             let baseTimestamp: bigint | undefined;
                             let maxTimestamp: bigint | undefined;
 
@@ -69,9 +74,9 @@ export class Producer {
                                 }
                             });
 
-                            const baseSequence = this.nextSequence(topic, parseInt(partition), messages.length);
+                            const baseSequence = this.nextSequence(topic, partitionIndex, messages.length);
                             return {
-                                index: parseInt(partition),
+                                index: partitionIndex,
                                 baseOffset: 0n,
                                 partitionLeaderEpoch: -1,
                                 attributes: 0,
@@ -95,8 +100,8 @@ export class Producer {
                             };
                         }),
                     })),
-                });
-            }),
+                }),
+            ),
         );
     }
 

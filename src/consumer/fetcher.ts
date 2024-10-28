@@ -14,7 +14,7 @@ type FetcherOptions = {
     onResponse: (fetcherId: number, response: Awaited<ReturnType<(typeof API.FETCH)['response']>>) => Promise<void>;
 };
 
-export class Fetcher extends EventEmitter<{ stop: []; stopped: []; data: []; drain: [] }> {
+export class Fetcher extends EventEmitter<{ stopped: [] }> {
     private isRunning = false;
 
     constructor(
@@ -24,10 +24,9 @@ export class Fetcher extends EventEmitter<{ stop: []; stopped: []; data: []; dra
         super();
     }
 
-    public async loop() {        
+    public async loop() {
         this.isRunning = true;
-        this.once('stop', () => (this.isRunning = false));
-        
+
         try {
             while (this.isRunning) {
                 await this.step();
@@ -38,14 +37,17 @@ export class Fetcher extends EventEmitter<{ stop: []; stopped: []; data: []; dra
         }
     }
 
-    @trace(() => ({ root: true }))
+    @trace()
     private async step() {
         const { nodeId, assignment, consumerGroup, fetch, onResponse } = this.options;
 
         const response = await fetch(nodeId, assignment);
-        await consumerGroup?.handleLastHeartbeat();
+        if (!this.isRunning) {
+            return;
+        }
+        consumerGroup?.handleLastHeartbeat();
         await onResponse(this.fetcherId, response);
-        await consumerGroup?.handleLastHeartbeat();
+        consumerGroup?.handleLastHeartbeat();
     }
 
     public async stop() {
@@ -53,9 +55,10 @@ export class Fetcher extends EventEmitter<{ stop: []; stopped: []; data: []; dra
             return;
         }
 
-        this.emit('stop');
-        return new Promise<void>((resolve) => {
+        const stopPromise = new Promise<void>((resolve) => {
             this.once('stopped', resolve);
         });
+        this.isRunning = false;
+        return stopPromise;
     }
 }

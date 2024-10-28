@@ -9,7 +9,7 @@ type ProcessorOptions = {
     process: (batch: Batch) => Promise<void>;
 };
 
-export class Processor extends EventEmitter<{ stop: []; stopped: [] }> {
+export class Processor extends EventEmitter<{ stopped: [] }> {
     private isRunning = false;
 
     constructor(private options: ProcessorOptions) {
@@ -18,7 +18,6 @@ export class Processor extends EventEmitter<{ stop: []; stopped: [] }> {
 
     public async loop() {
         this.isRunning = true;
-        this.once('stop', () => (this.isRunning = false));
 
         try {
             while (this.isRunning) {
@@ -30,7 +29,7 @@ export class Processor extends EventEmitter<{ stop: []; stopped: [] }> {
         }
     }
 
-    @trace(() => ({ root: true }))
+    @trace()
     private async step() {
         const { poll, process } = this.options;
 
@@ -45,9 +44,10 @@ export class Processor extends EventEmitter<{ stop: []; stopped: [] }> {
             return;
         }
 
-        return new Promise<void>((resolve) => {
+        const stopPromise = new Promise<void>((resolve) => {
             this.once('stopped', resolve);
-            this.emit('stop');
         });
+        this.isRunning = false;
+        return stopPromise;
     }
 }

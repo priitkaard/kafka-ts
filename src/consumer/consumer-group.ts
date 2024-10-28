@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import { API, API_ERROR } from '../api';
 import { KEY_TYPE } from '../api/find-coordinator';
 import { Assignment, MemberAssignment } from '../api/sync-group';
@@ -20,7 +21,7 @@ type ConsumerGroupOptions = {
     offsetManager: OffsetManager;
 };
 
-export class ConsumerGroup {
+export class ConsumerGroup extends EventEmitter<{ offsetCommit: [] }> {
     private coordinatorId = -1;
     private memberId = '';
     private generationId = -1;
@@ -29,13 +30,16 @@ export class ConsumerGroup {
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private heartbeatError: KafkaTSError | null = null;
 
-    constructor(private options: ConsumerGroupOptions) {}
+    constructor(private options: ConsumerGroupOptions) {
+        super();
+    }
 
     @trace()
     public async join() {
         await this.findCoordinator();
         await this.options.cluster.setSeedBroker(this.coordinatorId);
 
+        this.memberId = '';
         await this.joinGroup();
         await this.syncGroup();
         await this.offsetFetch();
@@ -59,10 +63,14 @@ export class ConsumerGroup {
         }
     }
 
-    public async handleLastHeartbeat() {
+    public handleLastHeartbeat() {
         if (this.heartbeatError) {
             throw this.heartbeatError;
         }
+    }
+
+    public resetHeartbeat() {
+        this.heartbeatError = null;
     }
 
     private async findCoordinator() {
@@ -151,30 +159,34 @@ export class ConsumerGroup {
         if (!request.groups.length) return;
 
         const response = await cluster.sendRequest(API.OFFSET_FETCH, request);
+
+        const topicPartitions: Record<string, Set<number>> = {};
         response.groups.forEach((group) => {
             group.topics.forEach((topic) => {
-                topic.partitions
-                    .filter(({ committedOffset }) => committedOffset >= 0)
-                    .forEach(({ partitionIndex, committedOffset }) =>
-                        offsetManager.resolve(topic.name, partitionIndex, committedOffset),
-                    );
+                topicPartitions[topic.name] ??= new Set();
+                topic.partitions.forEach(({ partitionIndex, committedOffset }) => {
+                    if (committedOffset >= 0) {
+                        topicPartitions[topic.name].add(partitionIndex);
+                        offsetManager.resolve(topic.name, partitionIndex, committedOffset);
+                    }
+                });
             });
         });
-        offsetManager.flush();
+        offsetManager.flush(topicPartitions);
     }
 
-    public async offsetCommit() {
+    public async offsetCommit(topicPartitions: Record<string, Set<number>>) {
         const { cluster, groupId, groupInstanceId, offsetManager } = this.options;
         const request = {
             groupId,
             groupInstanceId,
             memberId: this.memberId,
             generationIdOrMemberEpoch: this.generationId,
-            topics: Object.entries(offsetManager.pendingOffsets).map(([topic, partitions]) => ({
+            topics: Object.entries(topicPartitions).map(([topic, partitions]) => ({
                 name: topic,
-                partitions: Object.entries(partitions).map(([partition, offset]) => ({
-                    partitionIndex: parseInt(partition),
-                    committedOffset: offset,
+                partitions: [...partitions].map((partitionIndex) => ({
+                    partitionIndex,
+                    committedOffset: offsetManager.pendingOffsets[topic][partitionIndex],
                     committedLeaderEpoch: -1,
                     committedMetadata: null,
                 })),
@@ -184,7 +196,7 @@ export class ConsumerGroup {
             return;
         }
         await cluster.sendRequest(API.OFFSET_COMMIT, request);
-        offsetManager.flush();
+        this.emit('offsetCommit');
     }
 
     public async heartbeat() {
@@ -198,6 +210,10 @@ export class ConsumerGroup {
     }
 
     public async leaveGroup() {
+        if (this.coordinatorId === -1) {
+            return;
+        }
+
         const { cluster, groupId, groupInstanceId } = this.options;
         this.stopHeartbeater();
         try {
