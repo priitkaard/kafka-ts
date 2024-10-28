@@ -1,6 +1,6 @@
 type Assignment = { [topicName: string]: number[] };
 type TopicPartitionReplicaIds = { [topicName: string]: { [partition: number]: number[] } };
-export type NodeAssignment = { [replicaId: number]: Assignment };
+type NodeAssignment = { [replicaId: number]: Assignment };
 
 /** From replica ids pick the one with fewest assignments to balance the load across brokers */
 export const distributeAssignmentsToNodesBalanced = (
@@ -81,5 +81,3 @@ const getPartitionsByReplica = (assignment: Assignment, topicPartitionReplicaIds
     }
     return Object.entries(partitionsByReplicaId);
 };
-
-export const distributeAssignmentsToNodes = distributeAssignmentsToNodesBalanced;

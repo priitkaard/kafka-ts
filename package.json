@@ -9,7 +9,9 @@
         "url": "https://github.com/priitkaard/kafka-ts.git"
     },
     "scripts": {
-        "version:bump": "npm version prerelease --preid=beta",
+        "start": "docker-compose down && KAFKA_VERSION=3.7.1 docker-compose up -d && sleep 5 && bash ./scripts/create-scram-user.sh",
+        "version:beta": "npm version prerelease --preid=beta",
+        "version:patch": "npm version patch",
         "format": "prettier --write .",
         "build": "tsc",
         "watch": "tsc -w",

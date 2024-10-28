@@ -1,4 +1,4 @@
-import { API } from '../api';
+import { FetchResponse } from '../api/fetch';
 import { Assignment } from '../api/sync-group';
 import { Metadata } from '../metadata';
 import { Batch, Message } from '../types';
@@ -13,7 +13,7 @@ const trace = createTracer('FetchManager');
 export type BatchGranularity = 'partition' | 'topic' | 'broker';
 
 type FetchManagerOptions = {
-    fetch: (nodeId: number, assignment: Assignment) => Promise<Awaited<ReturnType<(typeof API.FETCH)['response']>>>;
+    fetch: (nodeId: number, assignment: Assignment) => Promise<FetchResponse>;
     process: (batch: Batch) => Promise<void>;
     metadata: Metadata;
     consumerGroup?: ConsumerGroup;
@@ -109,7 +109,7 @@ export class FetchManager {
     }
 
     @trace()
-    private async onResponse(fetcherId: number, response: Awaited<ReturnType<(typeof API.FETCH)['response']>>) {
+    private async onResponse(fetcherId: number, response: FetchResponse) {
         const { metadata, batchGranularity } = this.options;
 
         const batches = fetchResponseToBatches(response, batchGranularity, metadata);
@@ -127,7 +127,7 @@ export class FetchManager {
 }
 
 const fetchResponseToBatches = (
-    batch: Awaited<ReturnType<typeof API.FETCH.response>>,
+    batch: FetchResponse,
     batchGranularity: BatchGranularity,
     metadata: Metadata,
 ): Batch[] => {

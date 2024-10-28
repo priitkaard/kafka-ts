@@ -5,13 +5,14 @@
     "main": "dist/replicator.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
+        "start:jaeger": "docker run --rm --name jaeger -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 -d jaegertracing/all-in-one:1.62.0",
         "build": "tsc"
     },
     "dependencies": {
         "@opentelemetry/api": "^1.9.0",
         "@opentelemetry/auto-instrumentations-node": "^0.51.0",
         "@opentelemetry/context-async-hooks": "^1.27.0",
-        "@opentelemetry/exporter-jaeger": "^1.27.0",
+        "@opentelemetry/exporter-trace-otlp-grpc": "^0.54.0",
         "@opentelemetry/sdk-node": "^0.54.0",
         "kafka-ts": "file:../",
         "kafkajs": "^2.2.4"

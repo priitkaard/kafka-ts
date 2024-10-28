@@ -11,7 +11,7 @@ import { createTracer } from './utils/tracer';
 
 const trace = createTracer('Connection');
 
-export type ConnectionOptions = {
+type ConnectionOptions = {
     clientId: string | null;
     connection: TcpSocketConnectOpts;
     ssl: TLSSocketOptions | null;

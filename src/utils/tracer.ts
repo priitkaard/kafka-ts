@@ -47,5 +47,3 @@ export const createTracer =
             return tracer.startActiveSpan(module, propertyKey, { ...metadata }, () => original.apply(this, args));
         };
     };
-
-export const trace = createTracer('GLOBAL');

@@ -8,14 +8,14 @@ import { createKafkaClient } from './client';
 import { Cluster } from './cluster';
 import { KafkaTSApiError } from './utils/error';
 
-export const kafka = createKafkaClient({
+const kafka = createKafkaClient({
     clientId: 'kafka-ts',
     bootstrapServers: [{ host: 'localhost', port: 9092 }],
     sasl: saslPlain({ username: 'admin', password: 'admin' }),
     ssl: { ca: readFileSync('./certs/ca.crt').toString() },
 });
 
-describe.sequential('Request handler', () => {
+describe.sequential('Low-level API', () => {
     const groupId = randomBytes(16).toString('hex');
 
     let cluster: Cluster;

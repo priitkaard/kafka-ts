@@ -2,7 +2,7 @@
 
 **KafkaTS** is a Apache Kafka client library for Node.js. It provides both a low-level API for communicating directly with the Apache Kafka cluster and high-level APIs for publishing and subscribing to Kafka topics.
 
-**Please note that this project is still in early development and is not yet ready for production use. The interface before stable release is subject to change.**
+Supported Kafka versions: 3.7.0 and later
 
 ## Installation
 
@@ -96,12 +96,20 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 
 ### `createKafkaClient()`
 
-| Name             | Type                   | Required | Default | Description                                           |
-| ---------------- | ---------------------- | -------- | ------- | ----------------------------------------------------- |
-| clientId         | string                 | false    | _null_  | The client id used for all requests.                  |
-| bootstrapServers | TcpSocketConnectOpts[] | true     |         | List of kafka brokers for initial cluster discovery.  |
-| sasl             | SASLProvider           | false    |         | SASL provider (see "Supported SASL mechanisms" below) |
-| ssl              | TLSSocketOptions       | false    |         | SSL configuration.                                    |
+| Name             | Type                   | Required | Default | Description                                          |
+| ---------------- | ---------------------- | -------- | ------- | ---------------------------------------------------- |
+| clientId         | string                 | false    | _null_  | The client id used for all requests.                 |
+| bootstrapServers | TcpSocketConnectOpts[] | true     |         | List of kafka brokers for initial cluster discovery. |
+| sasl             | SASLProvider           | false    |         | SASL provider                                        |
+| ssl              | TLSSocketOptions       | false    |         | SSL configuration.                                   |
+
+#### Supported SASL mechanisms
+
+-   PLAIN: `saslPlain({ username, password })`
+-   SCRAM-SHA-256: `saslScramSha256({ username, password })`
+-   SCRAM-SHA-512: `saslScramSha512({ username, password })`
+
+Custom SASL mechanisms can be implemented following the `SASLProvider` interface. See [src/auth](./src/auth) for examples.
 
 ### `kafka.startConsumer()`
 
@@ -151,17 +159,3 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 | key       | Buffer \| null         | false    | _null_  | Message key                                                                                                                |
 | value     | Buffer \| null         | true     |         | Message value                                                                                                              |
 | headers   | Record<string, string> | false    | _null_  | Message headers                                                                                                            |
-
-### Supported SASL mechanisms
-
--   PLAIN: `saslPlain({ username, password })`
--   SCRAM-SHA-256: `saslScramSha256({ username, password })`
--   SCRAM-SHA-512: `saslScramSha512({ username, password })`
-
-Custom SASL mechanisms can be implemented following the `SASLProvider` interface. See [src/auth](./src/auth) for examples.
-
-## Backlog
-
-Minimal set of features left to implement before a stable release:
-
--   API versioning (Currently only tested against Kafka 3.7+)

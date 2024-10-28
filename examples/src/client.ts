@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { createKafkaClient, saslScramSha512, setTracer } from 'kafka-ts';
-import { OpenTelemetryTracer } from './utils/opentelemetry';
+import { OpenTelemetryTracer } from './opentelemetry';
 
 setTracer(new OpenTelemetryTracer());
 

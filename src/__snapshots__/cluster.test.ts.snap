@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Request handler > should commit offsets 1`] = `
+exports[`Low-level API > should commit offsets 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -21,7 +21,7 @@ exports[`Request handler > should commit offsets 1`] = `
 }
 `;
 
-exports[`Request handler > should create topics 1`] = `
+exports[`Low-level API > should create topics 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -290,7 +290,7 @@ exports[`Request handler > should create topics 1`] = `
 }
 `;
 
-exports[`Request handler > should delete topics 1`] = `
+exports[`Low-level API > should delete topics 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -307,7 +307,7 @@ exports[`Request handler > should delete topics 1`] = `
 }
 `;
 
-exports[`Request handler > should fail join group request with new memberId 1`] = `
+exports[`Low-level API > should fail join group request with new memberId 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -323,7 +323,7 @@ exports[`Request handler > should fail join group request with new memberId 1`] 
 }
 `;
 
-exports[`Request handler > should fetch messages 1`] = `
+exports[`Low-level API > should fetch messages 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -339,7 +339,7 @@ exports[`Request handler > should fetch messages 1`] = `
           "highWatermark": 1n,
           "lastStableOffset": 1n,
           "logStartOffset": 0n,
-          "partitionIndex": 0,
+          "partitionIndex": 6,
           "preferredReadReplica": -1,
           "records": [
             {
@@ -433,7 +433,7 @@ exports[`Request handler > should fetch messages 1`] = `
 }
 `;
 
-exports[`Request handler > should fetch offsets 1`] = `
+exports[`Low-level API > should fetch offsets 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -464,7 +464,7 @@ exports[`Request handler > should fetch offsets 1`] = `
 }
 `;
 
-exports[`Request handler > should find coordinator 1`] = `
+exports[`Low-level API > should find coordinator 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -483,7 +483,7 @@ exports[`Request handler > should find coordinator 1`] = `
 }
 `;
 
-exports[`Request handler > should heartbeat 1`] = `
+exports[`Low-level API > should heartbeat 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -492,7 +492,7 @@ exports[`Request handler > should heartbeat 1`] = `
 }
 `;
 
-exports[`Request handler > should init producer id 1`] = `
+exports[`Low-level API > should init producer id 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -503,7 +503,7 @@ exports[`Request handler > should init producer id 1`] = `
 }
 `;
 
-exports[`Request handler > should join group 1`] = `
+exports[`Low-level API > should join group 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -561,7 +561,7 @@ exports[`Request handler > should join group 1`] = `
 }
 `;
 
-exports[`Request handler > should leave group 1`] = `
+exports[`Low-level API > should leave group 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -578,7 +578,7 @@ exports[`Request handler > should leave group 1`] = `
 }
 `;
 
-exports[`Request handler > should produce messages 1`] = `
+exports[`Low-level API > should produce messages 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -592,7 +592,7 @@ exports[`Request handler > should produce messages 1`] = `
           "baseOffset": 0n,
           "errorCode": 0,
           "errorMessage": null,
-          "index": 0,
+          "index": 6,
           "logAppendTime": -1n,
           "logStartOffset": 0n,
           "recordErrors": [],
@@ -604,7 +604,7 @@ exports[`Request handler > should produce messages 1`] = `
 }
 `;
 
-exports[`Request handler > should request api versions 1`] = `
+exports[`Low-level API > should request api versions 1`] = `
 {
   "errorCode": 0,
   "throttleTimeMs": 0,
@@ -898,7 +898,7 @@ exports[`Request handler > should request api versions 1`] = `
 }
 `;
 
-exports[`Request handler > should request metadata for a topic 1`] = `
+exports[`Low-level API > should request metadata for a topic 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -925,7 +925,7 @@ exports[`Request handler > should request metadata for a topic 1`] = `
       "rack": null,
     },
   ],
-  "clusterId": "4L6g3nShT-eMCtK--X86sw",
+  "clusterId": "Some(4L6g3nShT-eMCtK--X86sw)",
   "controllerId": 0,
   "throttleTimeMs": 0,
   "topics": [
@@ -944,35 +944,21 @@ exports[`Request handler > should request metadata for a topic 1`] = `
           "leaderEpoch": 0,
           "leaderId": 0,
           "offlineReplicas": [],
+          "partitionIndex": 6,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
           "partitionIndex": 0,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 8,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 1,
           "replicaNodes": [
             0,
           ],
@@ -1000,49 +986,7 @@ exports[`Request handler > should request metadata for a topic 1`] = `
           "leaderEpoch": 0,
           "leaderId": 0,
           "offlineReplicas": [],
-          "partitionIndex": 6,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 5,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 7,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 4,
+          "partitionIndex": 1,
           "replicaNodes": [
             0,
           ],
@@ -1070,7 +1014,63 @@ exports[`Request handler > should request metadata for a topic 1`] = `
           "leaderEpoch": 0,
           "leaderId": 0,
           "offlineReplicas": [],
+          "partitionIndex": 8,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 5,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 4,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
           "partitionIndex": 3,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 7,
           "replicaNodes": [
             0,
           ],
@@ -1083,7 +1083,7 @@ exports[`Request handler > should request metadata for a topic 1`] = `
 }
 `;
 
-exports[`Request handler > should request metadata for all topics 1`] = `
+exports[`Low-level API > should request metadata for all topics 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,
@@ -1110,160 +1110,10 @@ exports[`Request handler > should request metadata for all topics 1`] = `
       "rack": null,
     },
   ],
-  "clusterId": "4L6g3nShT-eMCtK--X86sw",
+  "clusterId": "Some(4L6g3nShT-eMCtK--X86sw)",
   "controllerId": 0,
   "throttleTimeMs": 0,
   "topics": [
-    {
-      "_tag": undefined,
-      "errorCode": 0,
-      "isInternal": false,
-      "name": "my-topic",
-      "partitions": [
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 9,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 6,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 1,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 2,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 5,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 3,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 8,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 0,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 4,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 7,
-          "replicaNodes": [
-            0,
-          ],
-        },
-      ],
-      "topicAuthorizedOperations": -2147483648,
-      "topicId": "Any<UUID>",
-    },
     {
       "_tag": undefined,
       "errorCode": 0,
@@ -1279,35 +1129,21 @@ exports[`Request handler > should request metadata for all topics 1`] = `
           "leaderEpoch": 0,
           "leaderId": 0,
           "offlineReplicas": [],
+          "partitionIndex": 6,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
           "partitionIndex": 0,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 8,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 1,
           "replicaNodes": [
             0,
           ],
@@ -1335,49 +1171,7 @@ exports[`Request handler > should request metadata for all topics 1`] = `
           "leaderEpoch": 0,
           "leaderId": 0,
           "offlineReplicas": [],
-          "partitionIndex": 6,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 5,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 7,
-          "replicaNodes": [
-            0,
-          ],
-        },
-        {
-          "_tag": undefined,
-          "errorCode": 0,
-          "isrNodes": [
-            0,
-          ],
-          "leaderEpoch": 0,
-          "leaderId": 0,
-          "offlineReplicas": [],
-          "partitionIndex": 4,
+          "partitionIndex": 1,
           "replicaNodes": [
             0,
           ],
@@ -1405,7 +1199,63 @@ exports[`Request handler > should request metadata for all topics 1`] = `
           "leaderEpoch": 0,
           "leaderId": 0,
           "offlineReplicas": [],
+          "partitionIndex": 8,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 5,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 4,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
           "partitionIndex": 3,
+          "replicaNodes": [
+            0,
+          ],
+        },
+        {
+          "_tag": undefined,
+          "errorCode": 0,
+          "isrNodes": [
+            0,
+          ],
+          "leaderEpoch": 0,
+          "leaderId": 0,
+          "offlineReplicas": [],
+          "partitionIndex": 7,
           "replicaNodes": [
             0,
           ],
@@ -1418,7 +1268,7 @@ exports[`Request handler > should request metadata for all topics 1`] = `
 }
 `;
 
-exports[`Request handler > should sync group 1`] = `
+exports[`Low-level API > should sync group 1`] = `
 {
   "_tag": undefined,
   "_tag2": undefined,

@@ -1,7 +1,7 @@
 import { context, ROOT_CONTEXT, trace } from '@opentelemetry/api';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { AsyncHooksContextManager } from '@opentelemetry/context-async-hooks';
-import { JaegerExporter } from '@opentelemetry/exporter-jaeger/build/src/jaeger';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { Tracer } from 'kafka-ts';
@@ -10,16 +10,20 @@ const contextManager = new AsyncHooksContextManager();
 contextManager.enable();
 context.setGlobalContextManager(contextManager);
 
-const exporter = new JaegerExporter({ port: 6832, host: 'localhost', maxPacketSize: 9000 });
+const exporter = new OTLPTraceExporter({ url: 'http://localhost:4317' });
 
 const sdk = new NodeSDK({
     serviceName: 'kafka-ts',
     traceExporter: exporter,
-    spanProcessors: [new BatchSpanProcessor(exporter, { maxQueueSize: 128, maxExportBatchSize: 128 })],
+    spanProcessors: [new BatchSpanProcessor(exporter)],
     instrumentations: [getNodeAutoInstrumentations()],
 });
 
 sdk.start();
+
+process.once('SIGINT', () => {
+    sdk.shutdown();
+});
 
 const tracer = trace.getTracer('kafka-ts');
 

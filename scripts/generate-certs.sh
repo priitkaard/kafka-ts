@@ -23,3 +23,5 @@ keytool -importkeystore -srckeystore certs/kafka.keystore.jks \
     -deststorepass password \
     -destkeystore certs/kafka.truststore.jks \
     -noprompt
+
+rm certs/{ca.key,ca.srl,kafka.crt,kafka.csr,kafka.key}

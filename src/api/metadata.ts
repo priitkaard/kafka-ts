@@ -1,7 +1,7 @@
 import { createApi } from '../utils/api';
 import { KafkaTSApiError } from '../utils/error';
 
-export type Metadata = ReturnType<(typeof METADATA)['response']>;
+export type Metadata = Awaited<ReturnType<(typeof METADATA)['response']>>;
 
 export const METADATA = createApi({
     apiKey: 3,

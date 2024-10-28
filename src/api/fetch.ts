@@ -8,6 +8,8 @@ export const enum IsolationLevel {
     READ_COMMITTED = 1,
 }
 
+export type FetchResponse = Awaited<ReturnType<(typeof FETCH)['response']>>;
+
 export const FETCH = createApi({
     apiKey: 1,
     apiVersion: 16,

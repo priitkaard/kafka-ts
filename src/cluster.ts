@@ -1,6 +1,7 @@
 import { TcpSocketConnectOpts } from 'net';
 import { TLSSocketOptions } from 'tls';
 import { API } from './api';
+import { Metadata } from './api/metadata';
 import { Broker, SASLProvider } from './broker';
 import { SendRequest } from './connection';
 import { KafkaTSError } from './utils/error';
@@ -16,8 +17,7 @@ type ClusterOptions = {
 export class Cluster {
     private seedBroker = new Broker({ clientId: null, sasl: null, ssl: null, options: { port: 9092 } });
     private brokerById: Record<number, Broker> = {};
-    private brokerMetadata: Record<number, Awaited<ReturnType<(typeof API.METADATA)['response']>>['brokers'][number]> =
-        {};
+    private brokerMetadata: Record<number, Metadata['brokers'][number]> = {};
 
     constructor(private options: ClusterOptions) {}
 

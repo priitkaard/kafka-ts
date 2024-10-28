@@ -1,5 +1,5 @@
 import { EventEmitter } from 'stream';
-import { API } from '../api';
+import { FetchResponse } from '../api/fetch';
 import { Assignment } from '../api/sync-group';
 import { createTracer } from '../utils/tracer';
 import { ConsumerGroup } from './consumer-group';
@@ -10,8 +10,8 @@ type FetcherOptions = {
     nodeId: number;
     assignment: Assignment;
     consumerGroup?: ConsumerGroup;
-    fetch: (nodeId: number, assignment: Assignment) => Promise<Awaited<ReturnType<(typeof API.FETCH)['response']>>>;
-    onResponse: (fetcherId: number, response: Awaited<ReturnType<(typeof API.FETCH)['response']>>) => Promise<void>;
+    fetch: (nodeId: number, assignment: Assignment) => Promise<FetchResponse>;
+    onResponse: (fetcherId: number, response: FetchResponse) => Promise<void>;
 };
 
 export class Fetcher extends EventEmitter<{ stopped: [] }> {
