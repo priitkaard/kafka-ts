@@ -1,0 +1,6 @@
+/.github/
+/certs/
+/examples/
+/scripts/
+docker-compose.yml
+log4j.properties
