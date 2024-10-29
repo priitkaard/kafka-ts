@@ -2,7 +2,7 @@
 
 **KafkaTS** is a Apache Kafka client library for Node.js. It provides both a low-level API for communicating directly with the Apache Kafka cluster and high-level APIs for publishing and subscribing to Kafka topics.
 
-Supported Kafka versions: 3.7.0 and later
+**Supported Kafka versions:** 3.6 and later
 
 ## Installation
 
