@@ -3,14 +3,12 @@ import { KafkaTSApiError } from '../utils/error';
 
 export const OFFSET_FETCH = createApi({
     apiKey: 9,
-    apiVersion: 9,
+    apiVersion: 8,
     request: (
         encoder,
         data: {
             groups: {
                 groupId: string;
-                memberId: string | null;
-                memberEpoch: number;
                 topics: {
                     name: string;
                     partitionIndexes: number[];
@@ -24,8 +22,6 @@ export const OFFSET_FETCH = createApi({
             .writeCompactArray(data.groups, (encoder, group) =>
                 encoder
                     .writeCompactString(group.groupId)
-                    .writeCompactString(group.memberId)
-                    .writeInt32(group.memberEpoch)
                     .writeCompactArray(group.topics, (encoder, topic) =>
                         encoder
                             .writeCompactString(topic.name)

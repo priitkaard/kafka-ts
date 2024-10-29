@@ -3,7 +3,7 @@ import { KafkaTSApiError } from '../utils/error';
 
 export const OFFSET_COMMIT = createApi({
     apiKey: 8,
-    apiVersion: 9,
+    apiVersion: 8,
     request: (
         encoder,
         data: {

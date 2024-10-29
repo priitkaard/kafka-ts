@@ -4,7 +4,7 @@ import { KafkaTSApiError } from '../utils/error.js';
 
 export const PRODUCE = createApi({
     apiKey: 0,
-    apiVersion: 10,
+    apiVersion: 9,
     request: (
         encoder,
         data: {

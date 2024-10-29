@@ -321,8 +321,6 @@ describe.sequential('Low-level API', () => {
             groups: [
                 {
                     groupId,
-                    memberId,
-                    memberEpoch: 0,
                     topics: [
                         {
                             name: 'kafka-ts-test-topic',

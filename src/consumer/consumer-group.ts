@@ -147,8 +147,6 @@ export class ConsumerGroup extends EventEmitter<{ offsetCommit: [] }> {
             groups: [
                 {
                     groupId,
-                    memberId: this.memberId,
-                    memberEpoch: -1,
                     topics: topics
                         .map((topic) => ({ name: topic, partitionIndexes: assignment[topic] ?? [] }))
                         .filter(({ partitionIndexes }) => partitionIndexes.length),
