@@ -1,6 +1,6 @@
 {
     "name": "kafka-ts",
-    "version": "0.0.1-beta.6",
+    "version": "0.0.1",
     "main": "dist/index.js",
     "author": "Priit Käärd",
     "license": "MIT",
@@ -23,5 +23,10 @@
         "typescript": "^5.4.5",
         "vitest": "^1.6.0"
     },
-    "keywords": ["kafka", "client", "producer", "consumer"]
+    "keywords": [
+        "kafka",
+        "client",
+        "producer",
+        "consumer"
+    ]
 }
