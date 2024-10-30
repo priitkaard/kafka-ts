@@ -5,7 +5,7 @@ import { Cluster } from './cluster';
 import { Consumer, ConsumerOptions } from './consumer/consumer';
 import { Producer, ProducerOptions } from './producer/producer';
 
-type ClientOptions = {
+export type ClientOptions = {
     clientId?: string | null;
     bootstrapServers: TcpSocketConnectOpts[];
     sasl?: SASLProvider | null;
