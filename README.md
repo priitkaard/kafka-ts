@@ -81,6 +81,10 @@ process.once('SIGTERM', async () => {
 
 See the [examples](./examples) for more detailed examples.
 
+#### Logging
+
+By default KafkaTS logs out using a JSON logger. This can be globally replaced by calling setLogger method (see [src/utils/logger.ts](./src/utils/logger.ts))
+
 ## Motivation
 
 The existing low-level libraries (e.g. node-rdkafka) are bindings on librdkafka, which doesn't give enough control over the consumer logic.
