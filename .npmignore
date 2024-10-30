@@ -2,5 +2,8 @@
 /certs/
 /examples/
 /scripts/
+/src/
+.prettierrc
 docker-compose.yml
 log4j.properties
+tsconfig.json
