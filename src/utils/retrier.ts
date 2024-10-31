@@ -3,37 +3,41 @@ import { delay } from './delay';
 export type Retrier = (func: () => unknown) => Promise<void>;
 
 export const createExponentialBackoffRetrier =
-    (options: {
-        onFailure?: (error: unknown) => Promise<void>;
-        maxRetries?: number;
+    ({
+        retries = 5,
+        initialDelayMs = 100,
+        maxDelayMs = 3000,
+        multiplier = 2,
+        onFailure = (error) => {
+            throw error;
+        },
+    }: {
+        retries?: number;
         initialDelayMs?: number;
         maxDelayMs?: number;
         multiplier?: number;
-        retry?: number;
-    }): Retrier =>
-    async (func) => {
-        try {
-            await func();
-        } catch (error) {
-            const {
-                retry = 0,
-                maxRetries = 3,
-                onFailure = (error) => {
-                    throw error;
-                },
-                initialDelayMs = 100,
-                maxDelayMs = 3000,
-                multiplier = 2,
-            } = options;
+        onFailure?: (error: unknown) => unknown;
+    } = {}): Retrier =>
+    async (func): Promise<void> => {
+        let retriesLeft = retries;
+        let delayMs = initialDelayMs;
+        let lastError: unknown | undefined;
 
-            const isMaxRetriesExceeded = retry > maxRetries;
-            if (isMaxRetriesExceeded) return onFailure(error);
+        while (true) {
+            try {
+                await func();
+                return;
+            } catch (error) {
+                lastError = error;
+            }
 
-            const delayMs = Math.min(maxDelayMs, initialDelayMs * multiplier ** retry);
+            if (--retriesLeft < 1) break;
+
             await delay(delayMs);
-
-            return createExponentialBackoffRetrier({ ...options, retry: retry + 1 })(func);
+            delayMs = Math.min(maxDelayMs, delayMs * multiplier);
         }
+
+        await onFailure(lastError);
     };
 
-export const defaultRetrier = createExponentialBackoffRetrier({});
+export const defaultRetrier = createExponentialBackoffRetrier();

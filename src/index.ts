@@ -6,4 +6,5 @@ export * from './distributors/partitioner';
 export * from './types';
 export * from './utils/error';
 export * from './utils/logger';
+export * from './utils/retrier';
 export { Tracer, setTracer } from './utils/tracer';

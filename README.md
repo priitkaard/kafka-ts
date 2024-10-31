@@ -85,6 +85,37 @@ See the [examples](./examples) for more detailed examples.
 
 By default KafkaTS logs out using a JSON logger. This can be globally replaced by calling setLogger method (see [src/utils/logger.ts](./src/utils/logger.ts))
 
+#### Retries
+
+By default KafkaTS retries onBatch and onMessage using an exponential backoff strategy (see [src/utils/retrier.ts](./src/utils/retrier.ts)). In case of failure, processed message offsets are committed, and the consumer is restarted.
+
+In case you want to skip failed messages or implement a DLQ-like mechanism, you can overwrite `retrier` on `startConsumer()` and execute your own logic `onFailure`.
+
+Example if you simply want to skip the failing messages:
+
+```typescript
+await kafka.startConsumer({
+    // ...
+    retrier: createExponentialBackoffRetrier({ onFailure: () => {} }),
+});
+```
+
+#### Concurrency control
+
+Depending on the use case, you might want to control `concurrency` and `batchGranularity`.
+
+When subscribing to a topic, the consumer group leader will distribute all subscribed topic partitions to consumers within the group. Each consumer will then fetch messages only from partitions assigned to them. 
+
+`batchGranularity` controls how messages are split into batches from a fetch response:
+
+- **broker** - (default) all messages received from a single kafka broker will be included in a single batch.
+- **topic** - all messages received from a single broker and topic will be included in a single batch.
+- **partition** - a batch will only include messages from a single partition.
+
+After each batch is processed, the consumer will commit offsets for the processed messages. The more granual the batch is, the more often offsets are committed.
+
+`concurrency` controls how many aforementioned batches are processed concurrently. 
+
 ## Motivation
 
 The existing low-level libraries (e.g. node-rdkafka) are bindings on librdkafka, which doesn't give enough control over the consumer logic.
@@ -132,7 +163,7 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 | partitionMaxBytes      | number                                 | false    | 1_048_576                       | Maximum number of bytes to return per partition in the fetch response                                                                                                                                                                                                            |
 | allowTopicAutoCreation | boolean                                | false    | false                           | Allow kafka to auto-create topic when it doesn't exist                                                                                                                                                                                                                           |
 | fromBeginning          | boolean                                | false    | false                           | Start consuming from the beginning of the topic                                                                                                                                                                                                                                  |
-| batchGranularity       | BatchGranularity                       | false    | partition                       | Controls messages split from fetch response. Also controls how often offsets are committed. **onBatch** will include messages:<br/>- **partition** - from a single batch<br/>- **topic** - from all topic partitions<br/>- **broker** - from all assignned topics and partitions |
+| batchGranularity       | BatchGranularity                       | false    | broker                          | Controls messages split from fetch response. Also controls how often offsets are committed. **onBatch** will include messages:<br/>- **partition** - from a single batch<br/>- **topic** - from all topic partitions<br/>- **broker** - from all assignned topics and partitions |
 | concurrency            | number                                 | false    | 1                               | How many batches to process concurrently                                                                                                                                                                                                                                         |
 | onMessage              | (message: Message) => Promise<unknown> | true     |                                 | Callback executed on every message                                                                                                                                                                                                                                               |
 | onBatch                | (batch: Message[]) => Promise<unknown> | true     |                                 | Callback executed on every batch of messages (based on **batchGranuality**)                                                                                                                                                                                                      |
