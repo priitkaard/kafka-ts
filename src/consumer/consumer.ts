@@ -8,6 +8,7 @@ import { Message } from '../types';
 import { delay } from '../utils/delay';
 import { ConnectionError, KafkaTSApiError } from '../utils/error';
 import { log } from '../utils/logger';
+import { defaultRetrier, Retrier } from '../utils/retrier';
 import { createTracer } from '../utils/tracer';
 import { ConsumerGroup } from './consumer-group';
 import { ConsumerMetadata } from './consumer-metadata';
@@ -32,6 +33,7 @@ export type ConsumerOptions = {
     fromBeginning?: boolean;
     batchGranularity?: BatchGranularity;
     concurrency?: number;
+    retrier?: Retrier;
 } & ({ onBatch: (messages: Required<Message>[]) => unknown } | { onMessage: (message: Required<Message>) => unknown });
 
 export class Consumer extends EventEmitter<{ offsetCommit: [] }> {
@@ -62,8 +64,9 @@ export class Consumer extends EventEmitter<{ offsetCommit: [] }> {
             isolationLevel: options.isolationLevel ?? IsolationLevel.READ_UNCOMMITTED,
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
             fromBeginning: options.fromBeginning ?? false,
-            batchGranularity: options.batchGranularity ?? 'partition',
+            batchGranularity: options.batchGranularity ?? 'broker',
             concurrency: options.concurrency ?? 1,
+            retrier: options.retrier ?? defaultRetrier,
         };
 
         this.metadata = new ConsumerMetadata({ cluster: this.cluster });
@@ -100,7 +103,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: [] }> {
             await this.offsetManager.fetchOffsets({ fromBeginning });
             await this.consumerGroup?.join();
         } catch (error) {
-            log.warn('Failed to start consumer', error);
+            log.error('Failed to start consumer', error);
             log.debug(`Restarting consumer in 1 second...`);
             await delay(1000);
 
@@ -188,7 +191,11 @@ export class Consumer extends EventEmitter<{ offsetCommit: [] }> {
                     break;
                 }
                 log.error((error as Error).message, error);
-                this.close();
+
+                log.debug(`Restarting consumer in 1 second...`);
+                await delay(1000);
+
+                this.close().then(() => this.start());
                 break;
             }
         }
@@ -198,6 +205,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: [] }> {
     @trace((messages) => ({ count: messages.length }))
     private async process(messages: Required<Message>[]) {
         const { options } = this;
+        const { retrier } = options;
 
         const topicPartitions: Record<string, Set<number>> = {};
         for (const { topic, partition } of messages) {
@@ -205,23 +213,30 @@ export class Consumer extends EventEmitter<{ offsetCommit: [] }> {
             topicPartitions[topic].add(partition);
         }
 
+        const commit = async () => {
+            await this.consumerGroup?.offsetCommit(topicPartitions);
+            this.offsetManager.flush(topicPartitions);
+        };
+
         if ('onBatch' in options) {
-            await options.onBatch(messages);
+            await retrier(() => options.onBatch(messages));
 
             messages.forEach(({ topic, partition, offset }) =>
                 this.offsetManager.resolve(topic, partition, offset + 1n),
             );
         } else if ('onMessage' in options) {
             for (const message of messages) {
-                await options.onMessage(message);
+                await retrier(() => options.onMessage(message)).catch(async (error) => {
+                    await commit().catch();
+                    throw error;
+                });
 
                 const { topic, partition, offset } = message;
                 this.offsetManager.resolve(topic, partition, offset + 1n);
             }
         }
 
-        await this.consumerGroup?.offsetCommit(topicPartitions);
-        this.offsetManager.flush(topicPartitions);
+        await commit();
     }
 
     private fetch(nodeId: number, assignment: Assignment) {
