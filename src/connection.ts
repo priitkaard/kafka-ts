@@ -5,8 +5,8 @@ import { getApiName } from './api';
 import { Api } from './utils/api';
 import { Decoder } from './utils/decoder';
 import { Encoder } from './utils/encoder';
-import { ConnectionError } from './utils/error';
-import { log } from './utils/logger';
+import { ConnectionError, KafkaTSApiError } from './utils/error';
+import { jsonSerializer, log } from './utils/logger';
 import { createTracer } from './utils/tracer';
 
 const trace = createTracer('Connection');
@@ -100,14 +100,22 @@ export class Connection {
             }
         });
         clearTimeout(timeout);
-        const response = await api.response(responseDecoder);
 
-        assert(
-            responseDecoder.getOffset() - 4 === responseSize,
-            `Buffer not correctly consumed: ${responseDecoder.getOffset() - 4} !== ${responseSize}`,
-        );
+        try {
+            const response = await api.response(responseDecoder);
 
-        return response;
+            assert(
+                responseDecoder.getOffset() - 4 === responseSize,
+                `Buffer not correctly consumed: ${responseDecoder.getOffset() - 4} !== ${responseSize}`,
+            );
+
+            return response;
+        } catch (error) {
+            if (error instanceof KafkaTSApiError) {
+                error.request = JSON.stringify(body, jsonSerializer);
+            }
+            throw error;
+        }
     }
 
     private write(buffer: Buffer) {

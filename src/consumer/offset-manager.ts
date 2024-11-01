@@ -86,7 +86,13 @@ export class OffsetManager {
                 .flatMap(([topic, partitions]) => partitions.map((partition) => ({ topic, partition })))
                 .map(({ topic, partition }) => ({
                     name: topic,
-                    partitions: [{ partitionIndex: partition, currentLeaderEpoch: -1, timestamp: -1n }],
+                    partitions: [
+                        {
+                            partitionIndex: partition,
+                            currentLeaderEpoch: -1,
+                            timestamp: fromBeginning ? -2n : -1n,
+                        },
+                    ],
                 })),
         });
 
@@ -95,7 +101,7 @@ export class OffsetManager {
             topicPartitions[name] ??= new Set();
             partitions.forEach(({ partitionIndex, offset }) => {
                 topicPartitions[name].add(partitionIndex);
-                this.resolve(name, partitionIndex, fromBeginning ? 0n : offset);
+                this.resolve(name, partitionIndex, offset);
             });
         });
 

@@ -7,7 +7,16 @@ export interface Logger {
 
 export const jsonSerializer = (_: unknown, v: unknown) => {
     if (v instanceof Error) {
-        return { name: v.name, message: v.message, stack: v.stack, cause: v.cause };
+        return Object.getOwnPropertyNames(v).reduce(
+            (acc, key) => {
+                acc[key] = v[key as keyof Error];
+                return acc;
+            },
+            {} as Record<string, unknown>,
+        );
+    }
+    if (Buffer.isBuffer(v)) {
+        return v.toString();
     }
     if (typeof v === 'bigint') {
         return v.toString();

@@ -10,7 +10,7 @@
     },
     "scripts": {
         "start": "docker-compose down && KAFKA_VERSION=3.7.1 docker-compose up -d && sleep 5 && bash ./scripts/create-scram-user.sh",
-        "version:beta": "npm version prerelease --preid=beta",
+        "version:prerelease": "npm version prerelease",
         "version:patch": "npm version patch",
         "format": "prettier --write .",
         "build": "tsc",
