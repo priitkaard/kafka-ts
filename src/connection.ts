@@ -6,7 +6,7 @@ import { Api } from './utils/api';
 import { Decoder } from './utils/decoder';
 import { Encoder } from './utils/encoder';
 import { ConnectionError, KafkaTSApiError } from './utils/error';
-import { jsonSerializer, log } from './utils/logger';
+import { log } from './utils/logger';
 import { createTracer } from './utils/tracer';
 
 const trace = createTracer('Connection');
@@ -112,7 +112,7 @@ export class Connection {
             return response;
         } catch (error) {
             if (error instanceof KafkaTSApiError) {
-                error.request = JSON.stringify(body, jsonSerializer);
+                error.request = body;
             }
             throw error;
         }

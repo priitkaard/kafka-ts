@@ -1,4 +1,5 @@
 import { delay } from './delay';
+import { log } from './logger';
 
 export type Retrier = (func: () => unknown) => Promise<void>;
 
@@ -30,6 +31,7 @@ export const createExponentialBackoffRetrier =
             } catch (error) {
                 lastError = error;
             }
+            log.debug(`Failed to process batch (retriesLeft: ${retriesLeft})`);
 
             if (--retriesLeft < 1) break;
 
