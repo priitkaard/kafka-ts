@@ -53,55 +53,65 @@ export class Producer {
         );
 
         await Promise.all(
-            Object.entries(nodeTopicPartitionMessages).map(([nodeId, topicPartitionMessages]) =>
-                this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
-                    transactionalId: null,
-                    acks,
-                    timeoutMs: 5000,
-                    topicData: Object.entries(topicPartitionMessages).map(([topic, partitionMessages]) => ({
-                        name: topic,
-                        partitionData: Object.entries(partitionMessages).map(([partition, messages]) => {
-                            const partitionIndex = parseInt(partition);
-                            let baseTimestamp: bigint | undefined;
-                            let maxTimestamp: bigint | undefined;
+            Object.entries(nodeTopicPartitionMessages).map(async ([nodeId, topicPartitionMessages]) => {
+                const topicData = Object.entries(topicPartitionMessages).map(([topic, partitionMessages]) => ({
+                    name: topic,
+                    partitionData: Object.entries(partitionMessages).map(([partition, messages]) => {
+                        const partitionIndex = parseInt(partition);
+                        let baseTimestamp: bigint | undefined;
+                        let maxTimestamp: bigint | undefined;
 
-                            messages.forEach(({ timestamp = defaultTimestamp }) => {
-                                if (!baseTimestamp || timestamp < baseTimestamp) {
-                                    baseTimestamp = timestamp;
-                                }
-                                if (!maxTimestamp || timestamp > maxTimestamp) {
-                                    maxTimestamp = timestamp;
-                                }
-                            });
+                        messages.forEach(({ timestamp = defaultTimestamp }) => {
+                            if (!baseTimestamp || timestamp < baseTimestamp) {
+                                baseTimestamp = timestamp;
+                            }
+                            if (!maxTimestamp || timestamp > maxTimestamp) {
+                                maxTimestamp = timestamp;
+                            }
+                        });
 
-                            const baseSequence = this.getBaseSequence(topic, partitionIndex, messages.length);
-                            return {
-                                index: partitionIndex,
-                                baseOffset: 0n,
-                                partitionLeaderEpoch: -1,
+                        const baseSequence = this.nextBaseSequence(topic, partitionIndex, messages.length);
+                        return {
+                            index: partitionIndex,
+                            baseOffset: 0n,
+                            partitionLeaderEpoch: -1,
+                            attributes: 0,
+                            lastOffsetDelta: messages.length - 1,
+                            baseTimestamp: baseTimestamp ?? 0n,
+                            maxTimestamp: maxTimestamp ?? 0n,
+                            producerId: this.producerId,
+                            producerEpoch: 0,
+                            baseSequence,
+                            records: messages.map((message, index) => ({
                                 attributes: 0,
-                                lastOffsetDelta: messages.length - 1,
-                                baseTimestamp: baseTimestamp ?? 0n,
-                                maxTimestamp: maxTimestamp ?? 0n,
-                                producerId: this.producerId,
-                                producerEpoch: 0,
-                                baseSequence,
-                                records: messages.map((message, index) => ({
-                                    attributes: 0,
-                                    timestampDelta: (message.timestamp ?? defaultTimestamp) - (baseTimestamp ?? 0n),
-                                    offsetDelta: index,
-                                    key: message.key ?? null,
-                                    value: message.value,
-                                    headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({
-                                        key: Buffer.from(key),
-                                        value: Buffer.from(value),
-                                    })),
+                                timestampDelta: (message.timestamp ?? defaultTimestamp) - (baseTimestamp ?? 0n),
+                                offsetDelta: index,
+                                key: message.key ?? null,
+                                value: message.value,
+                                headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({
+                                    key: Buffer.from(key),
+                                    value: Buffer.from(value),
                                 })),
-                            };
-                        }),
-                    })),
-                }),
-            ),
+                            })),
+                        };
+                    }),
+                }));
+                try {
+                    return await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
+                        transactionalId: null,
+                        acks,
+                        timeoutMs: 5000,
+                        topicData,
+                    });
+                } catch (error) {
+                    topicData.forEach(({ name, partitionData }) => {
+                        partitionData.forEach(({ index, records }) => {
+                            this.revertBaseSequence(name, index, records.length);
+                        });
+                    });
+                    throw error;
+                }
+            }),
         );
     }
 
@@ -134,7 +144,7 @@ export class Producer {
         }
     }
 
-    private getBaseSequence(topic: string, partition: number, messagesCount: number) {
+    private nextBaseSequence(topic: string, partition: number, messagesCount: number) {
         this.sequences[topic] ??= {};
         this.sequences[topic][partition] ??= 0;
 
@@ -142,5 +152,9 @@ export class Producer {
         this.sequences[topic][partition] += messagesCount;
 
         return baseSequence;
+    }
+
+    private revertBaseSequence(topic: string, partition: number, messagesCount: number) {
+        this.sequences[topic][partition] -= messagesCount;
     }
 }
