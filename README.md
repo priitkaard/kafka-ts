@@ -25,7 +25,7 @@ export const kafka = createKafkaClient({
 
 ```typescript
 const consumer = await kafka.startConsumer({
-    groupId: 'my-consumer-group'.
+    groupId: 'my-consumer-group',
     topics: ['my-topic'],
     onMessage: (message) => {
         console.log(message);
