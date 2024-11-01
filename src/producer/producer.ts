@@ -74,7 +74,7 @@ export class Producer {
                                 }
                             });
 
-                            const baseSequence = this.nextSequence(topic, partitionIndex, messages.length);
+                            const baseSequence = this.getBaseSequence(topic, partitionIndex, messages.length);
                             return {
                                 index: partitionIndex,
                                 baseOffset: 0n,
@@ -134,9 +134,13 @@ export class Producer {
         }
     }
 
-    private nextSequence(topic: string, partition: number, messagesCount: number) {
+    private getBaseSequence(topic: string, partition: number, messagesCount: number) {
         this.sequences[topic] ??= {};
         this.sequences[topic][partition] ??= 0;
-        return (this.sequences[topic][partition] += messagesCount || 1);
+
+        const baseSequence = this.sequences[topic][partition];
+        this.sequences[topic][partition] += messagesCount;
+
+        return baseSequence;
     }
 }
