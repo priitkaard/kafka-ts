@@ -57,7 +57,9 @@ export class Broker {
             }
             const { apiVersion } = apiByKey[apiKey];
             if (apiVersion < minVersion || apiVersion > maxVersion) {
-                throw new KafkaTSError(`API ${apiKey} version ${apiVersion} is not supported by the broker (minVersion=${minVersion}, maxVersion=${maxVersion})`);
+                throw new KafkaTSError(
+                    `API ${apiKey} version ${apiVersion} is not supported by the broker (minVersion=${minVersion}, maxVersion=${maxVersion})`,
+                );
             }
         });
     }

@@ -1,10 +1,10 @@
-import EventEmitter from 'events';
 import { API, API_ERROR } from '../api';
 import { KEY_TYPE } from '../api/find-coordinator';
 import { Assignment, MemberAssignment } from '../api/sync-group';
 import { Cluster } from '../cluster';
 import { KafkaTSApiError, KafkaTSError } from '../utils/error';
 import { createTracer } from '../utils/tracer';
+import { Consumer } from './consumer';
 import { ConsumerMetadata } from './consumer-metadata';
 import { OffsetManager } from './offset-manager';
 
@@ -19,9 +19,10 @@ type ConsumerGroupOptions = {
     rebalanceTimeoutMs: number;
     metadata: ConsumerMetadata;
     offsetManager: OffsetManager;
+    consumer: Consumer;
 };
 
-export class ConsumerGroup extends EventEmitter<{ offsetCommit: [] }> {
+export class ConsumerGroup {
     private coordinatorId = -1;
     private memberId = '';
     private generationId = -1;
@@ -30,9 +31,7 @@ export class ConsumerGroup extends EventEmitter<{ offsetCommit: [] }> {
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private heartbeatError: KafkaTSError | null = null;
 
-    constructor(private options: ConsumerGroupOptions) {
-        super();
-    }
+    constructor(private options: ConsumerGroupOptions) {}
 
     @trace()
     public async join() {
@@ -174,7 +173,7 @@ export class ConsumerGroup extends EventEmitter<{ offsetCommit: [] }> {
     }
 
     public async offsetCommit(topicPartitions: Record<string, Set<number>>) {
-        const { cluster, groupId, groupInstanceId, offsetManager } = this.options;
+        const { cluster, groupId, groupInstanceId, offsetManager, consumer } = this.options;
         const request = {
             groupId,
             groupInstanceId,
@@ -194,17 +193,18 @@ export class ConsumerGroup extends EventEmitter<{ offsetCommit: [] }> {
             return;
         }
         await cluster.sendRequest(API.OFFSET_COMMIT, request);
-        this.emit('offsetCommit');
+        consumer.emit('offsetCommit');
     }
 
     public async heartbeat() {
-        const { cluster, groupId, groupInstanceId } = this.options;
+        const { cluster, groupId, groupInstanceId, consumer } = this.options;
         await cluster.sendRequest(API.HEARTBEAT, {
             groupId,
             groupInstanceId,
             memberId: this.memberId,
             generationId: this.generationId,
         });
+        consumer.emit('heartbeat');
     }
 
     public async leaveGroup() {

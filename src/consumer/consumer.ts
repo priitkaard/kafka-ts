@@ -36,7 +36,7 @@ export type ConsumerOptions = {
     retrier?: Retrier;
 } & ({ onBatch: (messages: Required<Message>[]) => unknown } | { onMessage: (message: Required<Message>) => unknown });
 
-export class Consumer extends EventEmitter<{ offsetCommit: [] }> {
+export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> {
     private options: Required<ConsumerOptions>;
     private metadata: ConsumerMetadata;
     private consumerGroup: ConsumerGroup | undefined;
@@ -85,9 +85,9 @@ export class Consumer extends EventEmitter<{ offsetCommit: [] }> {
                   rebalanceTimeoutMs: this.options.rebalanceTimeoutMs,
                   metadata: this.metadata,
                   offsetManager: this.offsetManager,
+                  consumer: this,
               })
             : undefined;
-        this.consumerGroup?.on('offsetCommit', () => this.emit('offsetCommit'));
     }
 
     @trace()
