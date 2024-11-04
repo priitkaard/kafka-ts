@@ -125,7 +125,7 @@ export class Connection {
     private write(buffer: Buffer) {
         return new Promise<void>((resolve, reject) => {
             const { stack } = new Error('Write error');
-            this.socket.write(buffer, (error) => {
+            this.socket.write(buffer, 'binary', (error) => {
                 if (error) {
                     const err = new ConnectionError(error.message);
                     err.stack += `\n${stack}`;
