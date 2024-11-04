@@ -52,59 +52,66 @@ export class Producer {
             this.metadata.getTopicPartitionLeaderIds(),
         );
 
-        await Promise.all(
-            Object.entries(nodeTopicPartitionMessages).map(async ([nodeId, topicPartitionMessages]) => {
-                const topicData = Object.entries(topicPartitionMessages).map(([topic, partitionMessages]) => ({
-                    name: topic,
-                    partitionData: Object.entries(partitionMessages).map(([partition, messages]) => {
-                        const partitionIndex = parseInt(partition);
-                        let baseTimestamp: bigint | undefined;
-                        let maxTimestamp: bigint | undefined;
-
-                        messages.forEach(({ timestamp = defaultTimestamp }) => {
-                            if (!baseTimestamp || timestamp < baseTimestamp) {
-                                baseTimestamp = timestamp;
-                            }
-                            if (!maxTimestamp || timestamp > maxTimestamp) {
-                                maxTimestamp = timestamp;
-                            }
-                        });
-
-                        return {
-                            index: partitionIndex,
-                            baseOffset: 0n,
-                            partitionLeaderEpoch: -1,
-                            attributes: 0,
-                            lastOffsetDelta: messages.length - 1,
-                            baseTimestamp: baseTimestamp ?? 0n,
-                            maxTimestamp: maxTimestamp ?? 0n,
-                            producerId: this.producerId,
-                            producerEpoch: 0,
-                            baseSequence: this.getSequence(topic, partitionIndex),
-                            records: messages.map((message, index) => ({
+        try {
+            await Promise.all(
+                Object.entries(nodeTopicPartitionMessages).map(async ([nodeId, topicPartitionMessages]) => {
+                    const topicData = Object.entries(topicPartitionMessages).map(([topic, partitionMessages]) => ({
+                        name: topic,
+                        partitionData: Object.entries(partitionMessages).map(([partition, messages]) => {
+                            const partitionIndex = parseInt(partition);
+                            let baseTimestamp: bigint | undefined;
+                            let maxTimestamp: bigint | undefined;
+    
+                            messages.forEach(({ timestamp = defaultTimestamp }) => {
+                                if (!baseTimestamp || timestamp < baseTimestamp) {
+                                    baseTimestamp = timestamp;
+                                }
+                                if (!maxTimestamp || timestamp > maxTimestamp) {
+                                    maxTimestamp = timestamp;
+                                }
+                            });
+    
+                            return {
+                                index: partitionIndex,
+                                baseOffset: 0n,
+                                partitionLeaderEpoch: -1,
                                 attributes: 0,
-                                timestampDelta: (message.timestamp ?? defaultTimestamp) - (baseTimestamp ?? 0n),
-                                offsetDelta: index,
-                                key: message.key ?? null,
-                                value: message.value,
-                                headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({ key, value })),
-                            })),
-                        };
-                    }),
-                }));
-                await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
-                    transactionalId: null,
-                    acks,
-                    timeoutMs: 5000,
-                    topicData,
-                });
-                topicData.forEach(({ name, partitionData }) => {
-                    partitionData.forEach(({ index, records }) => {
-                        this.updateSequence(name, index, records.length);
+                                lastOffsetDelta: messages.length - 1,
+                                baseTimestamp: baseTimestamp ?? 0n,
+                                maxTimestamp: maxTimestamp ?? 0n,
+                                producerId: this.producerId,
+                                producerEpoch: 0,
+                                baseSequence: this.getSequence(topic, partitionIndex),
+                                records: messages.map((message, index) => ({
+                                    attributes: 0,
+                                    timestampDelta: (message.timestamp ?? defaultTimestamp) - (baseTimestamp ?? 0n),
+                                    offsetDelta: index,
+                                    key: message.key ?? null,
+                                    value: message.value,
+                                    headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({ key, value })),
+                                })),
+                            };
+                        }),
+                    }));
+                    await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
+                        transactionalId: null,
+                        acks,
+                        timeoutMs: 5000,
+                        topicData,
                     });
-                });
-            }),
-        );
+                    topicData.forEach(({ name, partitionData }) => {
+                        partitionData.forEach(({ index, records }) => {
+                            this.updateSequence(name, index, records.length);
+                        });
+                    });
+                }),
+            );
+        } catch (error) {
+            if ((error instanceof KafkaTSApiError) && error.errorCode === API_ERROR.OUT_OF_ORDER_SEQUENCE_NUMBER) {
+                await this.initProducerId();
+            }
+            throw error;
+        }
     }
 
     public async close() {
