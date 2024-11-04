@@ -36,7 +36,7 @@ export type ConsumerOptions = {
     retrier?: Retrier;
 } & ({ onBatch: (messages: Required<Message>[]) => unknown } | { onMessage: (message: Required<Message>) => unknown });
 
-export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> {
+export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> {
     private options: Required<ConsumerOptions>;
     private metadata: ConsumerMetadata;
     private consumerGroup: ConsumerGroup | undefined;
@@ -129,40 +129,39 @@ export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> 
         const { groupId, batchGranularity, concurrency } = this.options;
 
         while (!this.stopHook) {
-            await this.consumerGroup?.join();
-
-            // TODO: If leader is not available, find another read replica
-            const nodeAssignments = Object.entries(
-                distributeMessagesToTopicPartitionLeaders(
-                    Object.entries(this.metadata.getAssignment()).flatMap(([topic, partitions]) =>
-                        partitions.map((partition) => ({ topic, partition })),
-                    ),
-                    this.metadata.getTopicPartitionLeaderIds(),
-                ),
-            ).map(([nodeId, assignment]) => ({
-                nodeId: parseInt(nodeId),
-                assignment: Object.fromEntries(
-                    Object.entries(assignment).map(([topic, partitions]) => [
-                        topic,
-                        Object.keys(partitions).map(Number),
-                    ]),
-                ),
-            }));
-
-            const numPartitions = Object.values(this.metadata.getAssignment()).flat().length;
-            const numProcessors = Math.min(concurrency, numPartitions);
-
-            this.fetchManager = new FetchManager({
-                fetch: this.fetch.bind(this),
-                process: this.process.bind(this),
-                metadata: this.metadata,
-                consumerGroup: this.consumerGroup,
-                nodeAssignments,
-                batchGranularity,
-                concurrency: numProcessors,
-            });
-
             try {
+                await this.consumerGroup?.join();
+
+                // TODO: If leader is not available, find another read replica
+                const nodeAssignments = Object.entries(
+                    distributeMessagesToTopicPartitionLeaders(
+                        Object.entries(this.metadata.getAssignment()).flatMap(([topic, partitions]) =>
+                            partitions.map((partition) => ({ topic, partition })),
+                        ),
+                        this.metadata.getTopicPartitionLeaderIds(),
+                    ),
+                ).map(([nodeId, assignment]) => ({
+                    nodeId: parseInt(nodeId),
+                    assignment: Object.fromEntries(
+                        Object.entries(assignment).map(([topic, partitions]) => [
+                            topic,
+                            Object.keys(partitions).map(Number),
+                        ]),
+                    ),
+                }));
+
+                const numPartitions = Object.values(this.metadata.getAssignment()).flat().length;
+                const numProcessors = Math.min(concurrency, numPartitions);
+
+                this.fetchManager = new FetchManager({
+                    fetch: this.fetch.bind(this),
+                    process: this.process.bind(this),
+                    metadata: this.metadata,
+                    consumerGroup: this.consumerGroup,
+                    nodeAssignments,
+                    batchGranularity,
+                    concurrency: numProcessors,
+                });
                 await this.fetchManager.start();
 
                 if (!nodeAssignments.length) {
@@ -171,7 +170,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> 
                     this.consumerGroup?.handleLastHeartbeat();
                 }
             } catch (error) {
-                await this.fetchManager.stop();
+                await this.fetchManager?.stop();
 
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
                     log.debug('Rebalance in progress...');
