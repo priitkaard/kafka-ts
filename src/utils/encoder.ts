@@ -50,7 +50,7 @@ export class Encoder {
 
     public writeUVarInt(value: number) {
         const byteArray = [];
-        while ((value & 0xffffffff) !== 0) {
+        while ((value & 0xffffff80) !== 0) {
             byteArray.push((value & 0x7f) | 0x80);
             value >>>= 7;
         }
@@ -65,11 +65,11 @@ export class Encoder {
 
     public writeUVarLong(value: bigint) {
         const byteArray = [];
-        while ((value & BigInt(0xffffffffffffffff)) !== BigInt(0)) {
+        while ((value & 0xffffffffffffff80n) !== 0n) {
             byteArray.push(Number((value & BigInt(0x7f)) | BigInt(0x80)));
-            value = value >> BigInt(7);
+            value >>= 7n;
         }
-        byteArray.push(Number(value));
+        byteArray.push(Number(value & BigInt(0x7f)));
         return this.write(Buffer.from(byteArray));
     }
 
