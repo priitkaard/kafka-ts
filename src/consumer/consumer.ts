@@ -126,7 +126,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> 
     }
 
     private async startFetchManager() {
-        const { batchGranularity, concurrency } = this.options;
+        const { groupId, batchGranularity, concurrency } = this.options;
 
         while (!this.stopHook) {
             await this.consumerGroup?.join();
@@ -166,7 +166,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> 
                 await this.fetchManager.start();
 
                 if (!nodeAssignments.length) {
-                    log.debug('No partitions assigned. Waiting for reassignment...');
+                    log.debug('No partitions assigned. Waiting for reassignment...', { groupId });
                     await delay(this.options.maxWaitMs);
                     this.consumerGroup?.handleLastHeartbeat();
                 }
