@@ -3,7 +3,6 @@ import { TLSSocketOptions } from 'tls';
 import { API } from './api';
 import { Connection, SendRequest } from './connection';
 import { KafkaTSError } from './utils/error';
-import { memo } from './utils/memo';
 
 export type SASLProvider = {
     mechanism: string;
@@ -38,7 +37,11 @@ export class Broker {
         return this;
     }
 
-    public ensureConnected = memo(() => this.connect());
+    public async ensureConnected() {
+        if (!this.connection.isConnected()) {
+            await this.connect();
+        }
+    }
 
     public async disconnect() {
         await this.connection.disconnect();

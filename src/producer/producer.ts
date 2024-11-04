@@ -6,7 +6,6 @@ import { Metadata } from '../metadata';
 import { Message } from '../types';
 import { delay } from '../utils/delay';
 import { KafkaTSApiError } from '../utils/error';
-import { memo } from '../utils/memo';
 import { createTracer } from '../utils/tracer';
 
 const trace = createTracer('Producer');
@@ -118,10 +117,12 @@ export class Producer {
         await this.cluster.disconnect();
     }
 
-    private ensureConnected = memo(async () => {
-        await this.cluster.connect();
-        await this.initProducerId();
-    });
+    private async ensureConnected() {
+        await this.cluster.ensureConnected();
+        if (!this.producerId) {
+            await this.initProducerId();
+        }
+    }
 
     private async initProducerId(): Promise<void> {
         try {

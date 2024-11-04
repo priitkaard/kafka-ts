@@ -29,6 +29,10 @@ export class Connection {
 
     constructor(private options: ConnectionOptions) {}
 
+    public isConnected() {
+        return !this.socket.pending && !this.socket.destroyed;
+    }
+
     @trace()
     public async connect() {
         this.queue = {};

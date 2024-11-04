@@ -33,6 +33,10 @@ export class Cluster {
         this.brokerMetadata = Object.fromEntries(metadata.brokers.map((options) => [options.nodeId, options]));
     }
 
+    public async ensureConnected() {
+        await Promise.all([this.seedBroker, ...Object.values(this.brokerById)].map((x) => x.ensureConnected()));
+    }
+
     public async disconnect() {
         await Promise.all([this.seedBroker.disconnect(), ...Object.values(this.brokerById).map((x) => x.disconnect())]);
     }
