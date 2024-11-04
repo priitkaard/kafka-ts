@@ -34,11 +34,15 @@ export class ConsumerGroup {
     constructor(private options: ConsumerGroupOptions) {}
 
     @trace()
-    public async join() {
+    public async init() {
         await this.findCoordinator();
         await this.options.cluster.setSeedBroker(this.coordinatorId);
 
         this.memberId = '';
+    }
+
+    @trace()
+    public async join() {
         await this.joinGroup();
         await this.syncGroup();
         await this.offsetFetch();
@@ -46,6 +50,9 @@ export class ConsumerGroup {
     }
 
     private async startHeartbeater() {
+        this.stopHeartbeater();
+        this.heartbeatError = null;
+
         this.heartbeatInterval = setInterval(async () => {
             try {
                 await this.heartbeat();
@@ -66,10 +73,6 @@ export class ConsumerGroup {
         if (this.heartbeatError) {
             throw this.heartbeatError;
         }
-    }
-
-    public resetHeartbeat() {
-        this.heartbeatError = null;
     }
 
     private async findCoordinator() {
@@ -121,7 +124,7 @@ export class ConsumerGroup {
                         acc[memberId][topic].push(partition);
                         return acc;
                     },
-                    {} as Record<string, Record<string, number[]>>,
+                    {} as Record<string, Assignment>,
                 );
             assignments = Object.entries(memberAssignments).map(([memberId, assignment]) => ({ memberId, assignment }));
         }
@@ -135,7 +138,7 @@ export class ConsumerGroup {
             protocolName: 'RoundRobinAssigner',
             assignments,
         });
-        metadata.setAssignment(JSON.parse(response.assignments || '{}') as Assignment);
+        metadata.setAssignment(response.assignments);
     }
 
     private async offsetFetch() {

@@ -34,14 +34,13 @@ export class FetchManager {
     private fetcherCallbacks: Record<number, () => void> = {};
 
     constructor(private options: FetchManagerOptions) {
-        const { fetch, process, consumerGroup, nodeAssignments, concurrency } = this.options;
+        const { fetch, process, nodeAssignments, concurrency } = this.options;
 
         this.fetchers = nodeAssignments.map(
             ({ nodeId, assignment }, index) =>
                 new Fetcher(index, {
                     nodeId,
                     assignment,
-                    consumerGroup,
                     fetch,
                     onResponse: this.onResponse.bind(this),
                 }),
@@ -89,6 +88,9 @@ export class FetchManager {
             return [];
         }
 
+        const { consumerGroup } = this.options;
+        consumerGroup?.handleLastHeartbeat();
+
         const batch = this.queue.shift();
         if (!batch) {
             // wait until new data is available or fetch manager is requested to stop
@@ -110,7 +112,9 @@ export class FetchManager {
 
     @trace()
     private async onResponse(fetcherId: number, response: FetchResponse) {
-        const { metadata, batchGranularity } = this.options;
+        const { metadata, batchGranularity, consumerGroup } = this.options;
+
+        consumerGroup?.handleLastHeartbeat();
 
         const batches = fetchResponseToBatches(response, batchGranularity, metadata);
         if (!batches.length) {
@@ -123,6 +127,8 @@ export class FetchManager {
             this.queue.push(...batches, { kind: 'checkpoint', fetcherId });
             this.pollQueue?.shift()?.();
         });
+
+        consumerGroup?.handleLastHeartbeat();
     }
 }
 

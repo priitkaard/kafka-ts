@@ -1,4 +1,6 @@
 import { createApi } from '../utils/api';
+import { Decoder } from '../utils/decoder';
+import { Encoder } from '../utils/encoder';
 import { KafkaTSApiError } from '../utils/error';
 
 export type Assignment = { [topic: string]: number[] };
@@ -34,7 +36,7 @@ export const SYNC_GROUP = createApi({
             .writeCompactArray(data.assignments, (encoder, assignment) =>
                 encoder
                     .writeCompactString(assignment.memberId)
-                    .writeCompactString(JSON.stringify(assignment.assignment))
+                    .writeCompactBytes(encodeAssignment(assignment.assignment))
                     .writeUVarInt(0),
             )
             .writeUVarInt(0),
@@ -45,10 +47,32 @@ export const SYNC_GROUP = createApi({
             errorCode: decoder.readInt16(),
             protocolType: decoder.readCompactString(),
             protocolName: decoder.readCompactString(),
-            assignments: decoder.readCompactString()!,
+            assignments: decodeAssignment(decoder.readCompactBytes()!),
             _tag2: decoder.readTagBuffer(),
         };
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
         return result;
     },
 });
+
+const encodeAssignment = (data: Assignment) =>
+    new Encoder()
+        .writeInt16(0)
+        .writeArray(Object.entries(data), (encoder, [topic, partitions]) =>
+            encoder.writeString(topic).writeArray(partitions, (encoder, partition) => encoder.writeInt32(partition)),
+        )
+        .writeBytes(Buffer.alloc(0))
+        .value();
+
+const decodeAssignment = (data: Buffer): Assignment => {
+    const decoder = new Decoder(data);
+    const result = {
+        version: decoder.readInt16(),
+        assignment: decoder.readArray((decoder) => ({
+            topic: decoder.readString(),
+            partitions: decoder.readArray((decoder) => decoder.readInt32()),
+        })),
+        userData: decoder.readBytes(),
+    };
+    return Object.fromEntries(result.assignment.map(({ topic, partitions }) => [topic, partitions]));
+};
