@@ -15,7 +15,7 @@ type ClusterOptions = {
 };
 
 export class Cluster {
-    private seedBroker = new Broker({ clientId: null, sasl: null, ssl: null, options: { port: 9092 } });
+    private seedBroker: Broker | undefined;
     private brokerById: Record<number, Broker> = {};
     private brokerMetadata: Record<number, Metadata['brokers'][number]> = {};
 
@@ -34,19 +34,25 @@ export class Cluster {
     }
 
     public async ensureConnected() {
+        if (!this.seedBroker) {
+            return this.connect();
+        }
         await Promise.all([this.seedBroker, ...Object.values(this.brokerById)].map((x) => x.ensureConnected()));
     }
 
     public async disconnect() {
-        await Promise.all([this.seedBroker.disconnect(), ...Object.values(this.brokerById).map((x) => x.disconnect())]);
+        await Promise.all([
+            this.seedBroker?.disconnect(),
+            ...Object.values(this.brokerById).map((x) => x.disconnect()),
+        ]);
     }
 
     public setSeedBroker = async (nodeId: number) => {
-        await this.seedBroker.disconnect();
+        await this.seedBroker?.disconnect();
         this.seedBroker = await this.acquireBroker(nodeId);
     };
 
-    public sendRequest: SendRequest = (...args) => this.seedBroker.sendRequest(...args);
+    public sendRequest: SendRequest = (...args) => this.seedBroker!.sendRequest(...args);
 
     public sendRequestToNode =
         (nodeId: number): SendRequest =>
