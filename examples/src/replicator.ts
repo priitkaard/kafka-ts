@@ -11,7 +11,7 @@ import { kafka } from './client';
             await producer.send(
                 messages.map((message) => ({
                     ...message,
-                    headers: { 'X-Replicated': 'true' },
+                    headers: { ...message.headers, 'X-Replicated': 'true' },
                     topic: `${message.topic}-replicated`,
                     offset: 0n,
                 })),

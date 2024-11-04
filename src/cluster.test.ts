@@ -152,8 +152,8 @@ describe.sequential('Low-level API', () => {
                                     attributes: 0,
                                     offsetDelta: 0,
                                     timestampDelta: 0n,
-                                    key: Buffer.from('key'),
-                                    value: Buffer.from('value'),
+                                    key: 'key',
+                                    value: 'value',
                                     headers: [
                                         {
                                             key: 'header-key',

@@ -20,7 +20,7 @@ export const defaultPartitioner: Partitioner = ({ metadata }) => {
         const partitions = metadata.getTopicPartitions()[topic];
         const numPartitions = partitions.length;
         if (key) {
-            return toPositive(murmur2(key)) % numPartitions;
+            return toPositive(murmur2(Buffer.from(key))) % numPartitions;
         }
         return toPositive(getNextValue(topic)) % numPartitions;
     };

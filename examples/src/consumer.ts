@@ -10,7 +10,7 @@ import { delay } from '../../dist/utils/delay';
         allowTopicAutoCreation: true,
         onBatch: (batch) => {
             log.info(
-                `Received batch: ${JSON.stringify(batch.map((message) => ({ ...message, value: message.value?.toString() })), jsonSerializer)}`,
+                `Received batch: ${JSON.stringify(batch, jsonSerializer)}`,
             );
             log.info(`Latency: ${Date.now() - parseInt(batch[0].timestamp.toString())}ms`)
         },

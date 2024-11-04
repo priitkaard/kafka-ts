@@ -3,8 +3,8 @@ export type Message = {
     partition?: number;
     offset?: bigint;
     timestamp?: bigint;
-    key?: Buffer | null;
-    value: Buffer | null;
+    key?: string | null;
+    value: string | null;
     headers?: Record<string, string>;
 };
 

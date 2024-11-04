@@ -108,17 +108,6 @@ export class Decoder {
         return value;
     }
 
-    public readVarIntBuffer() {
-        const length = this.readVarInt();
-        if (length < 0) {
-            return null;
-        }
-
-        const value = this.buffer.subarray(this.offset, this.offset + length);
-        this.offset += length;
-        return value;
-    }
-
     public readUUID() {
         const value = this.buffer.toString('hex', this.offset, this.offset + 16);
         this.offset += 16;

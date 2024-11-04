@@ -58,7 +58,7 @@ startBenchmarker({
         await producer.send(
             Array.from({ length }).map(() => ({
                 topic: topic,
-                value: Buffer.from('hello'),
+                value: 'hello',
                 timestamp: BigInt(timestamp),
             })),
             { acks },

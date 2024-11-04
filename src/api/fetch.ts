@@ -189,8 +189,8 @@ const decodeRecord = (decoder: Decoder) =>
         attributes: record.readInt8(),
         timestampDelta: record.readVarLong(),
         offsetDelta: record.readVarInt(),
-        key: record.readVarIntBuffer(),
-        value: record.readVarIntBuffer(),
+        key: record.readVarIntString(),
+        value: record.readVarIntString(),
         headers: record.readVarIntArray((header) => ({
             key: header.readVarIntString()!,
             value: header.readVarIntString()!,

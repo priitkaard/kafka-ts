@@ -103,13 +103,6 @@ export class Encoder {
         return this.writeVarInt(buffer.length).write(buffer);
     }
 
-    public writeVarIntBuffer(buffer: Buffer | null) {
-        if (buffer === null) {
-            return this.writeVarInt(-1);
-        }
-        return this.writeVarInt(buffer.length).write(buffer);
-    }
-
     public writeUUID(value: string | null) {
         if (value === null) {
             return this.write(Buffer.alloc(16));

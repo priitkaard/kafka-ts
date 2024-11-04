@@ -12,7 +12,7 @@ rl.on('line', async (line) => {
         [
             {
                 topic: 'my-topic',
-                value: Buffer.from(line),
+                value: line,
             },
         ],
         { acks: -1 },

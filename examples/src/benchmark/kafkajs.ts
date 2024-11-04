@@ -42,7 +42,7 @@ startBenchmarker({
         await producer.send({
             topic,
             messages: Array.from({ length }).map(() => ({
-                value: Buffer.from(timestamp.toString()),
+                value: 'hello',
                 timestamp: timestamp.toString(),
             })),
             acks,
