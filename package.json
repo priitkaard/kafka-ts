@@ -1,6 +1,6 @@
 {
     "name": "kafka-ts",
-    "version": "0.0.6-beta.4",
+    "version": "0.0.6-beta.5",
     "main": "dist/index.js",
     "author": "Priit Käärd",
     "license": "MIT",
