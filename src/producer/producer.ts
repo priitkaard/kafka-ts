@@ -70,7 +70,6 @@ export class Producer {
                             }
                         });
 
-                        const baseSequence = this.nextBaseSequence(topic, partitionIndex, messages.length);
                         return {
                             index: partitionIndex,
                             baseOffset: 0n,
@@ -81,36 +80,29 @@ export class Producer {
                             maxTimestamp: maxTimestamp ?? 0n,
                             producerId: this.producerId,
                             producerEpoch: 0,
-                            baseSequence,
+                            baseSequence: this.getSequence(topic, partitionIndex),
                             records: messages.map((message, index) => ({
                                 attributes: 0,
                                 timestampDelta: (message.timestamp ?? defaultTimestamp) - (baseTimestamp ?? 0n),
                                 offsetDelta: index,
                                 key: message.key ?? null,
                                 value: message.value,
-                                headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({
-                                    key: Buffer.from(key),
-                                    value: Buffer.from(value),
-                                })),
+                                headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({ key, value })),
                             })),
                         };
                     }),
                 }));
-                try {
-                    return await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
-                        transactionalId: null,
-                        acks,
-                        timeoutMs: 5000,
-                        topicData,
+                await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
+                    transactionalId: null,
+                    acks,
+                    timeoutMs: 5000,
+                    topicData,
+                });
+                topicData.forEach(({ name, partitionData }) => {
+                    partitionData.forEach(({ index, records }) => {
+                        this.updateSequence(name, index, records.length);
                     });
-                } catch (error) {
-                    topicData.forEach(({ name, partitionData }) => {
-                        partitionData.forEach(({ index, records }) => {
-                            this.revertBaseSequence(name, index, records.length);
-                        });
-                    });
-                    throw error;
-                }
+                });
             }),
         );
     }
@@ -144,17 +136,13 @@ export class Producer {
         }
     }
 
-    private nextBaseSequence(topic: string, partition: number, messagesCount: number) {
-        this.sequences[topic] ??= {};
-        this.sequences[topic][partition] ??= 0;
-
-        const baseSequence = this.sequences[topic][partition];
-        this.sequences[topic][partition] += messagesCount;
-
-        return baseSequence;
+    private getSequence(topic: string, partition: number) {
+        return this.sequences[topic]?.[partition] ?? 0;
     }
 
-    private revertBaseSequence(topic: string, partition: number, messagesCount: number) {
-        this.sequences[topic][partition] -= messagesCount;
+    private updateSequence(topic: string, partition: number, messagesCount: number) {
+        this.sequences[topic] ??= {};
+        this.sequences[topic][partition] ??= 0;
+        this.sequences[topic][partition] += messagesCount;
     }
 }

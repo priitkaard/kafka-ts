@@ -97,6 +97,17 @@ export class Decoder {
         return value;
     }
 
+    public readVarIntString() {
+        const length = this.readVarInt();
+        if (length < 0) {
+            return null;
+        }
+
+        const value = this.buffer.toString('utf-8', this.offset, this.offset + length);
+        this.offset += length;
+        return value;
+    }
+
     public readVarIntBuffer() {
         const length = this.readVarInt();
         if (length < 0) {
@@ -151,7 +162,7 @@ export class Decoder {
 
     public read(length?: number) {
         const value = this.buffer.subarray(this.offset, length !== undefined ? this.offset + length : undefined);
-        this.offset += Buffer.byteLength(value);
+        this.offset += value.length;
         return value;
     }
 

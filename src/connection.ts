@@ -83,7 +83,7 @@ export class Connection {
             .writeString(this.options.clientId);
 
         const request = api.request(encoder, body);
-        const requestEncoder = new Encoder().writeInt32(request.getByteLength()).writeEncoder(request);
+        const requestEncoder = new Encoder().writeInt32(request.getBufferLength()).writeEncoder(request);
 
         let timeout: NodeJS.Timeout | undefined;
         const { responseDecoder, responseSize } = await new Promise<RawResonse>(async (resolve, reject) => {

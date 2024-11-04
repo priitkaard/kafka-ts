@@ -192,7 +192,7 @@ const decodeRecord = (decoder: Decoder) =>
         key: record.readVarIntBuffer(),
         value: record.readVarIntBuffer(),
         headers: record.readVarIntArray((header) => ({
-            key: header.readVarIntBuffer(),
-            value: header.readVarIntBuffer(),
+            key: header.readVarIntString()!,
+            value: header.readVarIntString()!,
         })),
     }));

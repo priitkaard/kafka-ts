@@ -31,8 +31,8 @@ export const PRODUCE = createApi({
                         key: Buffer | null;
                         value: Buffer | null;
                         headers: {
-                            key: Buffer;
-                            value: Buffer;
+                            key: string;
+                            value: string;
                         }[];
                     }[];
                 }[];
@@ -64,10 +64,10 @@ export const PRODUCE = createApi({
                                     .writeVarIntBuffer(record.key)
                                     .writeVarIntBuffer(record.value)
                                     .writeVarIntArray(record.headers, (encoder, header) =>
-                                        encoder.writeVarIntBuffer(header.key).writeVarIntBuffer(header.value),
+                                        encoder.writeVarIntString(header.key).writeVarIntString(header.value),
                                     );
 
-                                return encoder.writeVarInt(recordBody.getByteLength()).writeEncoder(recordBody);
+                                return encoder.writeVarInt(recordBody.getBufferLength()).writeEncoder(recordBody);
                             })
                             .value();
 
@@ -79,12 +79,12 @@ export const PRODUCE = createApi({
 
                         const batch = new Encoder()
                             .writeInt64(partition.baseOffset)
-                            .writeInt32(batchHeader.getByteLength())
+                            .writeInt32(batchHeader.getBufferLength())
                             .writeEncoder(batchHeader);
 
                         return encoder
                             .writeInt32(partition.index)
-                            .writeUVarInt(batch.getByteLength() + 1) // batch size
+                            .writeUVarInt(batch.getBufferLength() + 1)
                             .writeEncoder(batch)
                             .writeUVarInt(0);
                     })

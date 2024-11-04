@@ -5,8 +5,8 @@ export class Encoder {
         return this.chunks;
     }
 
-    public getByteLength() {
-        return this.chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+    public getBufferLength() {
+        return this.chunks.reduce((acc, chunk) => acc + chunk.length, 0);
     }
 
     public write(...buffers: Buffer[]) {
@@ -82,10 +82,8 @@ export class Encoder {
         if (value === null) {
             return this.writeInt16(-1);
         }
-        const byteLength = Buffer.byteLength(value, 'utf-8');
-        const buffer = Buffer.allocUnsafe(byteLength);
-        buffer.write(value, 0, byteLength, 'utf-8');
-        return this.writeInt16(byteLength).write(buffer);
+        const buffer = Buffer.from(value, 'utf-8');
+        return this.writeInt16(buffer.length).write(buffer);
     }
 
     public writeCompactString(value: string | null) {
@@ -93,17 +91,23 @@ export class Encoder {
             return this.writeUVarInt(0);
         }
 
-        const byteLength = Buffer.byteLength(value, 'utf-8');
-        const buffer = Buffer.allocUnsafe(byteLength);
-        buffer.write(value, 0, byteLength, 'utf-8');
-        return this.writeUVarInt(byteLength + 1).write(buffer);
+        const buffer = Buffer.from(value, 'utf-8');
+        return this.writeUVarInt(buffer.length + 1).write(buffer);
+    }
+
+    public writeVarIntString(value: string | null) {
+        if (value === null) {
+            return this.writeVarInt(-1);
+        }
+        const buffer = Buffer.from(value, 'utf-8');
+        return this.writeVarInt(buffer.length).write(buffer);
     }
 
     public writeVarIntBuffer(buffer: Buffer | null) {
         if (buffer === null) {
             return this.writeVarInt(-1);
         }
-        return this.writeVarInt(buffer.byteLength).write(buffer);
+        return this.writeVarInt(buffer.length).write(buffer);
     }
 
     public writeUUID(value: string | null) {
