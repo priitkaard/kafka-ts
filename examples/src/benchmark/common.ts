@@ -22,6 +22,7 @@ export const startBenchmarker = async ({
     const benchmarkId = `benchmark-${Date.now()}`;
     const {
         TOPIC = benchmarkId,
+        GROUP_ID = benchmarkId,
         PRODUCER = 'true',
         CONSUMER = 'true',
         PARTITIONS = '10',
@@ -56,7 +57,7 @@ export const startBenchmarker = async ({
 
     const stopConsumer =
         enableConsumer &&
-        (await startConsumer({ groupId: benchmarkId, topic: TOPIC, concurrency, incrementCount }, (timestamp) => {
+        (await startConsumer({ groupId: GROUP_ID, topic: TOPIC, concurrency, incrementCount }, (timestamp) => {
             incrementCount('CONSUMER', 1);
             incrementSum('CONSUMER', Date.now() - timestamp);
         }));

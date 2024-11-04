@@ -2,14 +2,12 @@ import { EventEmitter } from 'stream';
 import { FetchResponse } from '../api/fetch';
 import { Assignment } from '../api/sync-group';
 import { createTracer } from '../utils/tracer';
-import { ConsumerGroup } from './consumer-group';
 
 const trace = createTracer('Fetcher');
 
 type FetcherOptions = {
     nodeId: number;
     assignment: Assignment;
-    consumerGroup?: ConsumerGroup;
     fetch: (nodeId: number, assignment: Assignment) => Promise<FetchResponse>;
     onResponse: (fetcherId: number, response: FetchResponse) => Promise<void>;
 };
@@ -39,15 +37,13 @@ export class Fetcher extends EventEmitter<{ stopped: [] }> {
 
     @trace()
     private async step() {
-        const { nodeId, assignment, consumerGroup, fetch, onResponse } = this.options;
+        const { nodeId, assignment, fetch, onResponse } = this.options;
 
         const response = await fetch(nodeId, assignment);
         if (!this.isRunning) {
             return;
         }
-        consumerGroup?.handleLastHeartbeat();
         await onResponse(this.fetcherId, response);
-        consumerGroup?.handleLastHeartbeat();
     }
 
     public async stop() {

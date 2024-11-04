@@ -101,7 +101,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> 
             await this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation });
             this.metadata.setAssignment(this.metadata.getTopicPartitions());
             await this.offsetManager.fetchOffsets({ fromBeginning });
-            await this.consumerGroup?.join();
+            await this.consumerGroup?.init();
         } catch (error) {
             log.error('Failed to start consumer', error);
             log.debug(`Restarting consumer in 1 second...`);
@@ -129,7 +129,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> 
         const { batchGranularity, concurrency } = this.options;
 
         while (!this.stopHook) {
-            this.consumerGroup?.resetHeartbeat();
+            await this.consumerGroup?.join();
 
             // TODO: If leader is not available, find another read replica
             const nodeAssignments = Object.entries(
