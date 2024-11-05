@@ -66,6 +66,10 @@ const encodeAssignment = (data: Assignment) =>
 
 const decodeAssignment = (data: Buffer): Assignment => {
     const decoder = new Decoder(data);
+    if (!decoder.getBufferLength()) {
+        return {};
+    }
+
     const result = {
         version: decoder.readInt16(),
         assignment: decoder.readArray((decoder) => ({

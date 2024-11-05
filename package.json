@@ -1,6 +1,6 @@
 {
     "name": "kafka-ts",
-    "version": "0.0.7",
+    "version": "0.0.14",
     "main": "dist/index.js",
     "author": "Priit Käärd",
     "license": "MIT",
@@ -11,7 +11,7 @@
     "scripts": {
         "up": "npm run down && KAFKA_VERSION=3.7.1 docker-compose up -d && sleep 5 && bash ./scripts/create-scram-user.sh",
         "down": "KAFKA_VERSION=3.7.1 docker-compose down",
-        "version:prerelease": "npm version prerelease",
+        "version:prerelease": "npm version prerelease --preid=beta",
         "version:patch": "npm version patch",
         "format": "prettier --write .",
         "build": "tsc",
