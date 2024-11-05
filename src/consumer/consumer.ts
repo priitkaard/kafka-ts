@@ -165,15 +165,13 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 await this.fetchManager.start();
 
                 if (!nodeAssignments.length) {
-                    log.debug('No partitions assigned. Waiting for reassignment...', { groupId });
-                    await delay(this.options.maxWaitMs);
-                    this.consumerGroup?.handleLastHeartbeat();
+                    await this.waitForReassignment();
                 }
             } catch (error) {
                 await this.fetchManager?.stop();
 
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
-                    log.debug('Rebalance in progress...');
+                    log.debug('Rebalance in progress...', { apiName: (error as KafkaTSApiError).apiName });
                     continue;
                 }
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.FENCED_INSTANCE_ID) {
@@ -199,6 +197,16 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             }
         }
         this.stopHook?.();
+    }
+
+    private async waitForReassignment() {
+        const { groupId } = this.options;
+
+        log.debug('No partitions assigned. Waiting for reassignment...', { groupId });
+        while (!this.stopHook) {
+            await delay(1000);
+            this.consumerGroup?.handleLastHeartbeat();
+        }
     }
 
     @trace((messages) => ({ count: messages.length }))
