@@ -36,7 +36,7 @@ export type ConsumerOptions = {
     retrier?: Retrier;
 } & ({ onBatch: (messages: Required<Message>[]) => unknown } | { onMessage: (message: Required<Message>) => unknown });
 
-export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> {
+export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> {
     private options: Required<ConsumerOptions>;
     private metadata: ConsumerMetadata;
     private consumerGroup: ConsumerGroup | undefined;
@@ -166,15 +166,13 @@ export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> 
                 await this.fetchManager.start();
 
                 if (!nodeAssignments.length) {
-                    log.debug('No partitions assigned. Waiting for reassignment...');
-                    await delay(this.options.maxWaitMs);
-                    this.consumerGroup?.handleLastHeartbeat();
+                    await this.waitForReassignment();
                 }
             } catch (error) {
                 await this.fetchManager.stop();
 
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
-                    log.debug('Rebalance in progress...');
+                    log.debug('Rebalance in progress...', { apiName: (error as KafkaTSApiError).apiName });
                     continue;
                 }
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.FENCED_INSTANCE_ID) {
@@ -200,6 +198,14 @@ export class Consumer extends EventEmitter<{ offsetCommit: [], heartbeat: [] }> 
             }
         }
         this.stopHook?.();
+    }
+
+    private async waitForReassignment() {
+        log.debug('No partitions assigned. Waiting for reassignment...');
+        while (!this.stopHook) {
+            await delay(1000);
+            this.consumerGroup?.handleLastHeartbeat();
+        }
     }
 
     @trace((messages) => ({ count: messages.length }))

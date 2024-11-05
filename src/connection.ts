@@ -116,6 +116,7 @@ export class Connection {
             return response;
         } catch (error) {
             if (error instanceof KafkaTSApiError) {
+                error.apiName = apiName;
                 error.request = body;
             }
             throw error;

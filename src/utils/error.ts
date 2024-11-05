@@ -8,6 +8,7 @@ export class KafkaTSError extends Error {
 }
 
 export class KafkaTSApiError<T = any> extends KafkaTSError {
+    public apiName: string | undefined;
     public request: unknown | undefined;
 
     constructor(
