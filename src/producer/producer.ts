@@ -1,7 +1,7 @@
 import { API, API_ERROR } from '../api';
 import { Cluster } from '../cluster';
 import { distributeMessagesToTopicPartitionLeaders } from '../distributors/messages-to-topic-partition-leaders';
-import { defaultPartitioner, Partition, Partitioner } from '../distributors/partitioner';
+import { defaultPartitioner, Partitioner } from '../distributors/partitioner';
 import { Metadata } from '../metadata';
 import { Message } from '../types';
 import { delay } from '../utils/delay';
@@ -21,7 +21,6 @@ export class Producer {
     private producerId = 0n;
     private producerEpoch = 0;
     private sequences: Record<string, Record<number, number>> = {};
-    private partition: Partition;
 
     constructor(
         private cluster: Cluster,
@@ -33,11 +32,13 @@ export class Producer {
             partitioner: options.partitioner ?? defaultPartitioner,
         };
         this.metadata = new Metadata({ cluster });
-        this.partition = this.options.partitioner({ metadata: this.metadata });
     }
 
     @trace(() => ({ root: true }))
-    public async send(messages: Message[], { acks = -1 }: { acks?: -1 | 1 } = {}) {
+    public async send(
+        messages: Message[],
+        { acks = -1, partitioner = this.options.partitioner }: { acks?: -1 | 1; partitioner?: Partitioner } = {},
+    ) {
         await this.ensureConnected();
 
         const { allowTopicAutoCreation } = this.options;
@@ -46,8 +47,10 @@ export class Producer {
         const topics = Array.from(new Set(messages.map((message) => message.topic)));
         await this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation });
 
+        const partition = partitioner({ metadata: this.metadata });
+
         const nodeTopicPartitionMessages = distributeMessagesToTopicPartitionLeaders(
-            messages.map((message) => ({ ...message, partition: this.partition(message) })),
+            messages.map((message) => ({ ...message, partition: partition(message) })),
             this.metadata.getTopicPartitionLeaderIds(),
         );
 
@@ -60,7 +63,7 @@ export class Producer {
                             const partitionIndex = parseInt(partition);
                             let baseTimestamp: bigint | undefined;
                             let maxTimestamp: bigint | undefined;
-    
+
                             messages.forEach(({ timestamp = defaultTimestamp }) => {
                                 if (!baseTimestamp || timestamp < baseTimestamp) {
                                     baseTimestamp = timestamp;
@@ -69,7 +72,7 @@ export class Producer {
                                     maxTimestamp = timestamp;
                                 }
                             });
-    
+
                             return {
                                 index: partitionIndex,
                                 baseOffset: 0n,
@@ -87,7 +90,10 @@ export class Producer {
                                     offsetDelta: index,
                                     key: message.key ?? null,
                                     value: message.value,
-                                    headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({ key, value })),
+                                    headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({
+                                        key,
+                                        value,
+                                    })),
                                 })),
                             };
                         }),
@@ -106,7 +112,7 @@ export class Producer {
                 }),
             );
         } catch (error) {
-            if ((error instanceof KafkaTSApiError) && error.errorCode === API_ERROR.OUT_OF_ORDER_SEQUENCE_NUMBER) {
+            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.OUT_OF_ORDER_SEQUENCE_NUMBER) {
                 await this.initProducerId();
             }
             throw error;

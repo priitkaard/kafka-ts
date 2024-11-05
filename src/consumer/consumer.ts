@@ -171,7 +171,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 await this.fetchManager?.stop();
 
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
-                    log.debug('Rebalance in progress...', { apiName: (error as KafkaTSApiError).apiName });
+                    log.debug('Rebalance in progress...', { apiName: (error as KafkaTSApiError).apiName, groupId });
                     continue;
                 }
                 if ((error as KafkaTSApiError).errorCode === API_ERROR.FENCED_INSTANCE_ID) {

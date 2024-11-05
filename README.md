@@ -38,7 +38,7 @@ const consumer = await kafka.startConsumer({
 ```typescript
 export const producer = kafka.createProducer();
 
-await producer.send([{ topic: 'my-topic', partition: 0, key: 'key', value: 'value' }]);
+await producer.send([{ topic: 'my-topic', key: 'key', value: 'value' }]);
 ```
 
 #### Low-level API
@@ -115,6 +115,24 @@ When subscribing to a topic, the consumer group leader will distribute all subsc
 After each batch is processed, the consumer will commit offsets for the processed messages. The more granual the batch is, the more often offsets are committed.
 
 `concurrency` controls how many aforementioned batches are processed concurrently. 
+
+#### Partitioning
+
+By default, messages are partitioned by key or round-robin if key is missing. Partition can be overwritten by `partition` property in the message. You can also override the default partitioner globally `kafka.createProducer({ partitioner: customPartitioner })` or per message `produder.send(messages, { partitioner: customPartitioner })`.
+
+A simple example how to partition messages by the value in message header `x-partition-key`:
+
+```typescript
+import type { Partitioner } from 'kafka-ts';
+import { defaultPartitioner } from 'kafka-ts';
+
+const myPartitioner: Partitioner = (context) => {
+    const partitioner = defaultPartitioner(context);
+    return (message) => partitioner({ ...message, key: message.headers?.['x-partition-key'] });
+};
+
+await producer.send(messages, { partitioner: myPartitioner });
+```
 
 ## Motivation
 
