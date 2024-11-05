@@ -60,7 +60,7 @@ export class Producer {
                             const partitionIndex = parseInt(partition);
                             let baseTimestamp: bigint | undefined;
                             let maxTimestamp: bigint | undefined;
-    
+
                             messages.forEach(({ timestamp = defaultTimestamp }) => {
                                 if (!baseTimestamp || timestamp < baseTimestamp) {
                                     baseTimestamp = timestamp;
@@ -69,7 +69,7 @@ export class Producer {
                                     maxTimestamp = timestamp;
                                 }
                             });
-    
+
                             return {
                                 index: partitionIndex,
                                 baseOffset: 0n,
@@ -87,7 +87,10 @@ export class Producer {
                                     offsetDelta: index,
                                     key: message.key ?? null,
                                     value: message.value,
-                                    headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({ key, value })),
+                                    headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({
+                                        key,
+                                        value,
+                                    })),
                                 })),
                             };
                         }),
@@ -106,7 +109,7 @@ export class Producer {
                 }),
             );
         } catch (error) {
-            if ((error instanceof KafkaTSApiError) && error.errorCode === API_ERROR.OUT_OF_ORDER_SEQUENCE_NUMBER) {
+            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.OUT_OF_ORDER_SEQUENCE_NUMBER) {
                 await this.initProducerId();
             }
             throw error;
