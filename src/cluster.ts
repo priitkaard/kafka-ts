@@ -37,7 +37,13 @@ export class Cluster {
         if (!this.seedBroker) {
             return this.connect();
         }
-        await Promise.all([this.seedBroker, ...Object.values(this.brokerById)].map((x) => x.ensureConnected()));
+        try {
+            await Promise.all([this.seedBroker, ...Object.values(this.brokerById)].map((x) => x.ensureConnected()));
+        } catch {
+            log.warn('Failed to connect to known brokers, reconnecting...');
+            await this.disconnect();
+            return this.connect();
+        }
     }
 
     public async disconnect() {

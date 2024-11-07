@@ -98,7 +98,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
 
         try {
             await this.cluster.connect();
-            await this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation });
+            await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation });
             this.metadata.setAssignment(this.metadata.getTopicPartitions());
             await this.offsetManager.fetchOffsets({ fromBeginning });
             await this.consumerGroup?.init();

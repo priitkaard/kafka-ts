@@ -68,7 +68,8 @@ export class Metadata {
         }
     }
 
-    private async fetchMetadata({
+    @trace()
+    public async fetchMetadata({
         topics,
         allowTopicAutoCreation,
     }: {

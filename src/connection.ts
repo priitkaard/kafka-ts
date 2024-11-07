@@ -68,7 +68,7 @@ export class Connection {
     public disconnect() {
         this.socket.removeAllListeners();
         return new Promise<void>((resolve) => {
-            if (this.socket.pending) {
+            if (!this.isConnected()) {
                 return resolve();
             }
             this.socket.end(resolve);
