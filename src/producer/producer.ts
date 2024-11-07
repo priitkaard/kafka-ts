@@ -109,6 +109,9 @@ export class Producer {
                 }),
             );
         } catch (error) {
+            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_LEADER_OR_FOLLOWER) {
+                await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation });
+            }
             if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.OUT_OF_ORDER_SEQUENCE_NUMBER) {
                 await this.initProducerId();
             }
