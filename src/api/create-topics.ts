@@ -9,19 +9,19 @@ export const CREATE_TOPICS = createApi({
         data: {
             topics: {
                 name: string;
-                numPartitions: number;
-                replicationFactor: number;
-                assignments: {
+                numPartitions?: number;
+                replicationFactor?: number;
+                assignments?: {
                     partitionIndex: number;
                     brokerIds: number[];
                 }[];
-                configs: {
+                configs?: {
                     name: string;
                     value: string | null;
                 }[];
             }[];
-            timeoutMs: number;
-            validateOnly: boolean;
+            timeoutMs?: number;
+            validateOnly?: boolean;
         },
     ) =>
         encoder
@@ -29,9 +29,9 @@ export const CREATE_TOPICS = createApi({
             .writeCompactArray(data.topics, (encoder, topic) =>
                 encoder
                     .writeCompactString(topic.name)
-                    .writeInt32(topic.numPartitions)
-                    .writeInt16(topic.replicationFactor)
-                    .writeCompactArray(topic.assignments, (encoder, assignment) =>
+                    .writeInt32(topic.numPartitions ?? -1)
+                    .writeInt16(topic.replicationFactor ?? -1)
+                    .writeCompactArray(topic.assignments ?? [], (encoder, assignment) =>
                         encoder
                             .writeInt32(assignment.partitionIndex)
                             .writeCompactArray(assignment.brokerIds, (encoder, brokerId) =>
@@ -39,13 +39,13 @@ export const CREATE_TOPICS = createApi({
                             )
                             .writeUVarInt(0),
                     )
-                    .writeCompactArray(topic.configs, (encoder, config) =>
+                    .writeCompactArray(topic.configs ?? [], (encoder, config) =>
                         encoder.writeCompactString(config.name).writeCompactString(config.value).writeUVarInt(0),
                     )
                     .writeUVarInt(0),
             )
-            .writeInt32(data.timeoutMs)
-            .writeBoolean(data.validateOnly)
+            .writeInt32(data.timeoutMs ?? 10_000)
+            .writeBoolean(data.validateOnly ?? false)
             .writeUVarInt(0),
     response: (decoder) => {
         const result = {

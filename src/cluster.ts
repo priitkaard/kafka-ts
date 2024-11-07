@@ -25,11 +25,7 @@ export class Cluster {
         this.seedBroker = await this.findSeedBroker();
         this.brokerById = {};
 
-        const metadata = await this.sendRequest(API.METADATA, {
-            allowTopicAutoCreation: false,
-            includeTopicAuthorizedOperations: false,
-            topics: [],
-        });
+        const metadata = await this.sendRequest(API.METADATA, { topics: [] });
         this.brokerMetadata = Object.fromEntries(metadata.brokers.map((options) => [options.nodeId, options]));
     }
 

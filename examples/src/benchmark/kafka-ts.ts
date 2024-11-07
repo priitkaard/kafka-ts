@@ -18,24 +18,10 @@ startBenchmarker({
         const cluster = kafka.createCluster();
         await cluster.connect();
 
-        const { controllerId } = await cluster.sendRequest(API.METADATA, {
-            allowTopicAutoCreation: false,
-            includeTopicAuthorizedOperations: false,
-            topics: [],
-        });
+        const { controllerId } = await cluster.sendRequest(API.METADATA, { topics: [] });
         await cluster.setSeedBroker(controllerId);
         await cluster.sendRequest(API.CREATE_TOPICS, {
-            validateOnly: false,
-            timeoutMs: 10_000,
-            topics: [
-                {
-                    name: topic,
-                    numPartitions: partitions,
-                    replicationFactor,
-                    assignments: [],
-                    configs: [],
-                },
-            ],
+            topics: [{ name: topic, numPartitions: partitions, replicationFactor }],
         });
         await cluster.disconnect();
     },

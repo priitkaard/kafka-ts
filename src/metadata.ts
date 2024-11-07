@@ -80,7 +80,6 @@ export class Metadata {
 
         const response = await cluster.sendRequest(API.METADATA, {
             allowTopicAutoCreation,
-            includeTopicAuthorizedOperations: false,
             topics: topics?.map((name) => ({ id: null, name })) ?? null,
         });
 

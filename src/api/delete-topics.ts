@@ -11,7 +11,7 @@ export const DELETE_TOPICS = createApi({
                 name: string | null;
                 topicId: string | null;
             }[];
-            timeoutMs: number;
+            timeoutMs?: number;
         },
     ) =>
         encoder
@@ -19,7 +19,7 @@ export const DELETE_TOPICS = createApi({
             .writeCompactArray(data.topics, (encoder, topic) =>
                 encoder.writeCompactString(topic.name).writeUUID(topic.topicId).writeUVarInt(0),
             )
-            .writeInt32(data.timeoutMs)
+            .writeInt32(data.timeoutMs ?? 10_000)
             .writeUVarInt(0),
     response: (decoder) => {
         const result = {

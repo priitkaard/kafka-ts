@@ -9,18 +9,18 @@ export const METADATA = createApi({
     request: (
         encoder,
         data: {
-            topics: { id: string | null; name: string }[] | null;
-            allowTopicAutoCreation: boolean;
-            includeTopicAuthorizedOperations: boolean;
+            topics?: { id: string | null; name: string }[] | null;
+            allowTopicAutoCreation?: boolean;
+            includeTopicAuthorizedOperations?: boolean;
         },
     ) =>
         encoder
             .writeUVarInt(0)
-            .writeCompactArray(data.topics, (encoder, topic) =>
+            .writeCompactArray(data.topics ?? null, (encoder, topic) =>
                 encoder.writeUUID(topic.id).writeCompactString(topic.name).writeUVarInt(0),
             )
-            .writeBoolean(data.allowTopicAutoCreation)
-            .writeBoolean(data.includeTopicAuthorizedOperations)
+            .writeBoolean(data.allowTopicAutoCreation ?? false)
+            .writeBoolean(data.includeTopicAuthorizedOperations ?? false)
             .writeUVarInt(0),
     response: (decoder) => {
         const result = {
