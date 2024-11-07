@@ -41,7 +41,7 @@ export class OffsetManager {
         });
     }
 
-    public async fetchOffsets(options: { fromBeginning: boolean }) {
+    public async fetchOffsets(options: { fromTimestamp: bigint }) {
         const { metadata } = this.options;
 
         const topicPartitions = Object.entries(metadata.getAssignment()).flatMap(([topic, partitions]) =>
@@ -71,11 +71,11 @@ export class OffsetManager {
     private async listOffsets({
         nodeId,
         nodeAssignment,
-        fromBeginning,
+        fromTimestamp,
     }: {
         nodeId: number;
         nodeAssignment: Assignment;
-        fromBeginning: boolean;
+        fromTimestamp: bigint;
     }) {
         const { cluster, isolationLevel } = this.options;
 
@@ -90,7 +90,7 @@ export class OffsetManager {
                         {
                             partitionIndex: partition,
                             currentLeaderEpoch: -1,
-                            timestamp: fromBeginning ? -2n : -1n,
+                            timestamp: fromTimestamp,
                         },
                     ],
                 })),

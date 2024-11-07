@@ -143,10 +143,13 @@ export class Decoder {
 
         return Array.from({ length }).map(() => {
             const size = this.readVarInt();
+            if (!size) {
+                return null as T;
+            }
             const child = new Decoder(this.buffer.subarray(this.offset, this.offset + size));
             this.offset += size;
             return callback(child);
-        });
+        }).filter(x => x !== null);
     }
 
     public read(length?: number) {

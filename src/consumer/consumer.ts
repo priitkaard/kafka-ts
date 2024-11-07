@@ -31,6 +31,7 @@ export type ConsumerOptions = {
     partitionMaxBytes?: number;
     allowTopicAutoCreation?: boolean;
     fromBeginning?: boolean;
+    fromTimestamp?: bigint;
     batchGranularity?: BatchGranularity;
     concurrency?: number;
     retrier?: Retrier;
@@ -64,6 +65,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             isolationLevel: options.isolationLevel ?? IsolationLevel.READ_UNCOMMITTED,
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
             fromBeginning: options.fromBeginning ?? false,
+            fromTimestamp: options.fromTimestamp ?? (options.fromBeginning ? -2n : -1n),
             batchGranularity: options.batchGranularity ?? 'broker',
             concurrency: options.concurrency ?? 1,
             retrier: options.retrier ?? defaultRetrier,
@@ -92,7 +94,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
 
     @trace()
     public async start(): Promise<void> {
-        const { topics, allowTopicAutoCreation, fromBeginning } = this.options;
+        const { topics, allowTopicAutoCreation, fromTimestamp } = this.options;
 
         this.stopHook = undefined;
 
@@ -100,7 +102,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             await this.cluster.connect();
             await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation });
             this.metadata.setAssignment(this.metadata.getTopicPartitions());
-            await this.offsetManager.fetchOffsets({ fromBeginning });
+            await this.offsetManager.fetchOffsets({ fromTimestamp });
             await this.consumerGroup?.init();
         } catch (error) {
             log.error('Failed to start consumer', error);
