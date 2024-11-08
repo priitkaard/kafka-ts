@@ -141,7 +141,7 @@ export class Connection {
         this.chunks.push(buffer);
 
         const decoder = new Decoder(Buffer.concat(this.chunks));
-        if (decoder.getBufferLength() < 4) {
+        if (!decoder.canReadBytes(4)) {
             return;
         }
 

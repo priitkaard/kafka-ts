@@ -11,6 +11,10 @@ export class Decoder {
         return this.buffer.length;
     }
 
+    public canReadBytes(bytes: number) {
+        return this.getBufferLength() - this.getOffset() >= bytes;
+    }
+
     public readInt8() {
         const value = this.buffer.readInt8(this.offset);
         this.offset += 1;

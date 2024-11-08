@@ -1,7 +1,8 @@
 import { findCodec } from '../codecs';
 import { createApi } from '../utils/api';
 import { Decoder } from '../utils/decoder';
-import { KafkaTSApiError } from '../utils/error';
+import { KafkaTSApiError, KafkaTSError } from '../utils/error';
+import { log } from '../utils/logger';
 
 export const enum IsolationLevel {
     READ_UNCOMMITTED = 0,
@@ -140,45 +141,69 @@ const decodeRecordBatch = (decoder: Decoder) => {
     const recordBatchDecoder = new Decoder(decoder.read(size));
 
     const results = [];
-    while (recordBatchDecoder.getBufferLength() > recordBatchDecoder.getOffset() + 12) {
+    while (recordBatchDecoder.canReadBytes(12)) {
         const baseOffset = recordBatchDecoder.readInt64();
         const batchLength = recordBatchDecoder.readInt32();
         if (!batchLength) {
             continue;
         }
 
+        if (!recordBatchDecoder.canReadBytes(batchLength)) {
+            // likely running into maxBytes limit
+            log.debug('Record batch is incomplete, skipping last batch.');
+            recordBatchDecoder.read()
+            continue;
+        }
+
         const batchDecoder = new Decoder(recordBatchDecoder.read(batchLength));
+        const partitionLeaderEpoch = batchDecoder.readInt32();
+        const magic = batchDecoder.readInt8();
+        if (magic !== 2) {
+            throw new KafkaTSError(`Unsupported magic byte: ${magic}`);
+        }
 
-        const result = {
-            baseOffset,
-            batchLength,
-            partitionLeaderEpoch: batchDecoder.readInt32(),
-            magic: batchDecoder.readInt8(),
-            crc: batchDecoder.readUInt32(),
-            attributes: batchDecoder.readInt16(),
-            lastOffsetDelta: batchDecoder.readInt32(),
-            baseTimestamp: batchDecoder.readInt64(),
-            maxTimestamp: batchDecoder.readInt64(),
-            producerId: batchDecoder.readInt64(),
-            producerEpoch: batchDecoder.readInt16(),
-            baseSequence: batchDecoder.readInt32(),
-            recordsLength: batchDecoder.read(4),
-            compressedRecords: batchDecoder.read(),
-        };
+        const crc = batchDecoder.readInt32();
+        const attributes = batchDecoder.readInt16();
 
-        const compression = result.attributes & 0x07;
-        const timestampType = (result.attributes & 0x08) >> 3 ? 'LogAppendTime' : 'CreateTime';
-        const isTransactional = !!((result.attributes & 0x10) >> 4);
-        const isControlBatch = !!((result.attributes & 0x20) >> 5);
-        const hasDeleteHorizonMs = !!((result.attributes & 0x40) >> 6);
+        const compression = attributes & 0x07;
+        const timestampType = (attributes & 0x08) >> 3 ? 'LogAppendTime' : 'CreateTime';
+        const isTransactional = !!((attributes & 0x10) >> 4);
+        const isControlBatch = !!((attributes & 0x20) >> 5);
+        const hasDeleteHorizonMs = !!((attributes & 0x40) >> 6);
+
+        if (compression !== 0) {
+            throw new KafkaTSError(`Unsupported compression: ${compression}`);
+        }
+
+        const lastOffsetDelta = batchDecoder.readInt32();
+        const baseTimestamp = batchDecoder.readInt64();
+        const maxTimestamp = batchDecoder.readInt64();
+        const producerId = batchDecoder.readInt64();
+        const producerEpoch = batchDecoder.readInt16();
+        const baseSequence = batchDecoder.readInt32();
+        const recordsLength = batchDecoder.read(4);
+        const compressedRecords = batchDecoder.read();
 
         results.push({
-            ...result,
+            baseOffset,
+            batchLength,
+            partitionLeaderEpoch,
+            magic,
+            crc,
+            attributes,
             compression,
             timestampType,
             isTransactional,
             isControlBatch,
             hasDeleteHorizonMs,
+            lastOffsetDelta,
+            baseTimestamp,
+            maxTimestamp,
+            producerId,
+            producerEpoch,
+            baseSequence,
+            recordsLength,
+            compressedRecords,
         });
     }
     return results;
