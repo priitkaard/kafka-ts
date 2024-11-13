@@ -26,7 +26,7 @@ startBenchmarker({
         await cluster.disconnect();
     },
     connectProducer: async () => () => producer.close(),
-    startConsumer: async ({ groupId, topic, concurrency, incrementCount }, callback) => {
+    startConsumer: async ({ groupId, topic, incrementCount }, callback) => {
         const consumer = await kafka.startConsumer({
             groupId,
             topics: [topic],
@@ -35,7 +35,6 @@ startBenchmarker({
                     callback(parseInt(message.timestamp.toString()));
                 }
             },
-            concurrency,
         });
         consumer.on('offsetCommit', () => incrementCount('OFFSET_COMMIT', 1));
         return () => consumer.close();

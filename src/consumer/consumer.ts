@@ -12,7 +12,7 @@ import { defaultRetrier, Retrier } from '../utils/retrier';
 import { createTracer } from '../utils/tracer';
 import { ConsumerGroup } from './consumer-group';
 import { ConsumerMetadata } from './consumer-metadata';
-import { BatchGranularity, FetchManager } from './fetch-manager';
+import { FetchManager } from './fetch-manager';
 import { OffsetManager } from './offset-manager';
 
 const trace = createTracer('Consumer');
@@ -32,10 +32,10 @@ export type ConsumerOptions = {
     allowTopicAutoCreation?: boolean;
     fromBeginning?: boolean;
     fromTimestamp?: bigint;
-    batchGranularity?: BatchGranularity;
-    concurrency?: number;
+    batchSize?: number | null;
     retrier?: Retrier;
-} & ({ onBatch: (messages: Required<Message>[]) => unknown } | { onMessage: (message: Required<Message>) => unknown });
+    onBatch: (messages: Required<Message>[]) => unknown;
+};
 
 export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> {
     private options: Required<ConsumerOptions>;
@@ -66,8 +66,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
             fromBeginning: options.fromBeginning ?? false,
             fromTimestamp: options.fromTimestamp ?? (options.fromBeginning ? -2n : -1n),
-            batchGranularity: options.batchGranularity ?? 'broker',
-            concurrency: options.concurrency ?? 1,
+            batchSize: options.batchSize ?? null,
             retrier: options.retrier ?? defaultRetrier,
         };
 
@@ -128,7 +127,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
     }
 
     private async startFetchManager() {
-        const { groupId, batchGranularity, concurrency } = this.options;
+        const { groupId, batchSize } = this.options;
 
         while (!this.stopHook) {
             try {
@@ -152,17 +151,13 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                     ),
                 }));
 
-                const numPartitions = Object.values(this.metadata.getAssignment()).flat().length;
-                const numProcessors = Math.min(concurrency, numPartitions);
-
                 this.fetchManager = new FetchManager({
                     fetch: this.fetch.bind(this),
                     process: this.process.bind(this),
                     metadata: this.metadata,
                     consumerGroup: this.consumerGroup,
+                    batchSize,
                     nodeAssignments,
-                    batchGranularity,
-                    concurrency: numProcessors,
                 });
                 await this.fetchManager.start();
 
@@ -222,30 +217,11 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             topicPartitions[topic].add(partition);
         }
 
-        const commit = async () => {
-            await this.consumerGroup?.offsetCommit(topicPartitions);
-            this.offsetManager.flush(topicPartitions);
-        };
+        await retrier(() => options.onBatch(messages));
+        messages.forEach(({ topic, partition, offset }) => this.offsetManager.resolve(topic, partition, offset + 1n));
 
-        if ('onBatch' in options) {
-            await retrier(() => options.onBatch(messages));
-
-            messages.forEach(({ topic, partition, offset }) =>
-                this.offsetManager.resolve(topic, partition, offset + 1n),
-            );
-        } else if ('onMessage' in options) {
-            for (const message of messages) {
-                await retrier(() => options.onMessage(message)).catch(async (error) => {
-                    await commit().catch();
-                    throw error;
-                });
-
-                const { topic, partition, offset } = message;
-                this.offsetManager.resolve(topic, partition, offset + 1n);
-            }
-        }
-
-        await commit();
+        await this.consumerGroup?.offsetCommit(topicPartitions);
+        this.offsetManager.flush(topicPartitions);
     }
 
     private fetch(nodeId: number, assignment: Assignment) {
