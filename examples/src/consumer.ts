@@ -1,6 +1,5 @@
 import { jsonSerializer, log } from 'kafka-ts';
 import { kafka } from './client';
-import { delay } from '../../dist/utils/delay';
 
 (async () => {
     const consumer = await kafka.startConsumer({
@@ -14,8 +13,6 @@ import { delay } from '../../dist/utils/delay';
             );
             log.info(`Latency: ${Date.now() - parseInt(batch[0].timestamp.toString())}ms`)
         },
-        batchGranularity: 'broker',
-        concurrency: 10,
     });
 
     process.on('SIGINT', async () => {

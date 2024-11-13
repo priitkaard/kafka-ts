@@ -59,10 +59,7 @@ export class FetchManager {
     public async stop() {
         this.isRunning = false;
 
-        const stopPromise = Promise.all([
-            ...this.fetchers.map((fetcher) => fetcher.stop()),
-            this.processor.stop(),
-        ]);
+        const stopPromise = Promise.all([...this.fetchers.map((fetcher) => fetcher.stop()), this.processor.stop()]);
 
         this.pollCallback?.();
 
@@ -81,7 +78,7 @@ export class FetchManager {
         const { consumerGroup, batchSize } = this.options;
         consumerGroup?.handleLastHeartbeat();
 
-        const batch = this.queue.splice(0, batchSize ?? undefined);
+        const batch = batchSize ? this.queue.splice(0, batchSize) : this.queue.splice(0);
         if (!batch.length) {
             await new Promise<void>((resolve) => (this.pollCallback = resolve));
             return this.poll();
