@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import { API, API_ERROR } from '../api';
-import { IsolationLevel } from '../api/fetch';
+import { FetchResponse, IsolationLevel } from '../api/fetch';
 import { Assignment } from '../api/sync-group';
 import { Cluster } from '../cluster';
 import { distributeMessagesToTopicPartitionLeaders } from '../distributors/messages-to-topic-partition-leaders';
@@ -32,7 +32,6 @@ export type ConsumerOptions = {
     allowTopicAutoCreation?: boolean;
     fromBeginning?: boolean;
     fromTimestamp?: bigint;
-    batchSize?: number | null;
     retrier?: Retrier;
     onBatch: (messages: Required<Message>[]) => unknown;
 };
@@ -66,7 +65,6 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
             fromBeginning: options.fromBeginning ?? false,
             fromTimestamp: options.fromTimestamp ?? (options.fromBeginning ? -2n : -1n),
-            batchSize: options.batchSize ?? null,
             retrier: options.retrier ?? defaultRetrier,
         };
 
@@ -127,7 +125,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
     }
 
     private async startFetchManager() {
-        const { groupId, batchSize } = this.options;
+        const { groupId } = this.options;
 
         while (!this.stopHook) {
             try {
@@ -154,9 +152,6 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 this.fetchManager = new FetchManager({
                     fetch: this.fetch.bind(this),
                     process: this.process.bind(this),
-                    metadata: this.metadata,
-                    consumerGroup: this.consumerGroup,
-                    batchSize,
                     nodeAssignments,
                 });
                 await this.fetchManager.start();
@@ -206,15 +201,37 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
         }
     }
 
-    @trace((messages) => ({ count: messages.length }))
-    private async process(messages: Required<Message>[]) {
+    @trace()
+    private async process(response: FetchResponse) {
         const { options } = this;
         const { retrier } = options;
 
+        this.consumerGroup?.handleLastHeartbeat();
+
         const topicPartitions: Record<string, Set<number>> = {};
-        for (const { topic, partition } of messages) {
+        const messages = response.responses.flatMap(({ topicId, partitions }) => {
+            const topic = this.metadata.getTopicNameById(topicId);
             topicPartitions[topic] ??= new Set();
-            topicPartitions[topic].add(partition);
+
+            return partitions.flatMap(({ partitionIndex, records }) => {
+                topicPartitions[topic].add(partitionIndex);
+                return records.flatMap(({ baseTimestamp, baseOffset, records }) =>
+                    records.flatMap(
+                        (message): Required<Message> => ({
+                            topic,
+                            partition: partitionIndex,
+                            key: message.key ?? null,
+                            value: message.value ?? null,
+                            headers: Object.fromEntries(message.headers.map(({ key, value }) => [key, value])),
+                            timestamp: baseTimestamp + BigInt(message.timestampDelta),
+                            offset: baseOffset + BigInt(message.offsetDelta),
+                        }),
+                    ),
+                );
+            });
+        });
+        if (!messages.length) {
+            return;
         }
 
         await retrier(() => options.onBatch(messages));
@@ -226,6 +243,8 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
 
     private fetch(nodeId: number, assignment: Assignment) {
         const { rackId, maxWaitMs, minBytes, maxBytes, partitionMaxBytes, isolationLevel } = this.options;
+
+        this.consumerGroup?.handleLastHeartbeat();
 
         return this.cluster.sendRequestToNode(nodeId)(API.FETCH, {
             maxWaitMs,

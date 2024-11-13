@@ -43,11 +43,16 @@ export class Producer {
         const { allowTopicAutoCreation } = this.options;
         const defaultTimestamp = BigInt(Date.now());
 
-        const topics = Array.from(new Set(messages.map((message) => message.topic)));
+        const topics = new Set(messages.map((message) => message.topic));
         await this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation });
 
+        const partitionedMessages = messages.map((message) => {
+            message.partition = this.partition(message);
+            return message as typeof message & { partition: number };
+        });
+
         const nodeTopicPartitionMessages = distributeMessagesToTopicPartitionLeaders(
-            messages.map((message) => ({ ...message, partition: this.partition(message) })),
+            partitionedMessages,
             this.metadata.getTopicPartitionLeaderIds(),
         );
 

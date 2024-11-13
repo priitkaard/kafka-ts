@@ -167,7 +167,6 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 | partitionMaxBytes      | number                                 | false    | 1_048_576                       | Maximum number of bytes to return per partition in the fetch response                |
 | allowTopicAutoCreation | boolean                                | false    | false                           | Allow kafka to auto-create topic when it doesn't exist                               |
 | fromTimestamp          | bigint                                 | false    | -1                              | Start consuming messages from timestamp (-1 = latest offsets, -2 = earliest offsets) |
-| batchSize              | number                                 | false    | null                            | Maximum number of records called `onBatch`                                           |
 | onBatch                | (batch: Message[]) => Promise<unknown> | true     |                                 | Callback executed when a batch of messages is received                               |
 
 ### `kafka.createProducer()`

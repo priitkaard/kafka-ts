@@ -9,16 +9,13 @@ type FetcherOptions = {
     nodeId: number;
     assignment: Assignment;
     fetch: (nodeId: number, assignment: Assignment) => Promise<FetchResponse>;
-    onResponse: (fetcherId: number, response: FetchResponse) => Promise<void>;
+    process: (response: FetchResponse) => Promise<void>;
 };
 
 export class Fetcher extends EventEmitter<{ stopped: [] }> {
     private isRunning = false;
 
-    constructor(
-        private fetcherId: number,
-        private options: FetcherOptions,
-    ) {
+    constructor(private options: FetcherOptions) {
         super();
     }
 
@@ -37,13 +34,12 @@ export class Fetcher extends EventEmitter<{ stopped: [] }> {
 
     @trace()
     private async step() {
-        const { nodeId, assignment, fetch, onResponse } = this.options;
+        const { nodeId, assignment, fetch, process } = this.options;
 
         const response = await fetch(nodeId, assignment);
-        if (!this.isRunning) {
-            return;
-        }
-        await onResponse(this.fetcherId, response);
+        if (!this.isRunning) return;
+
+        await process(response);
     }
 
     public async stop() {

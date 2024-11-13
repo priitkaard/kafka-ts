@@ -182,15 +182,19 @@ export class ConsumerGroup {
             groupInstanceId,
             memberId: this.memberId,
             generationIdOrMemberEpoch: this.generationId,
-            topics: Object.entries(topicPartitions).map(([topic, partitions]) => ({
-                name: topic,
-                partitions: [...partitions].map((partitionIndex) => ({
-                    partitionIndex,
-                    committedOffset: offsetManager.pendingOffsets[topic][partitionIndex],
-                    committedLeaderEpoch: -1,
-                    committedMetadata: null,
+            topics: Object.entries(topicPartitions)
+                .filter(([topic]) => topic in offsetManager.pendingOffsets)
+                .map(([topic, partitions]) => ({
+                    name: topic,
+                    partitions: [...partitions]
+                        .filter((partition) => partition in offsetManager.pendingOffsets[topic])
+                        .map((partitionIndex) => ({
+                            partitionIndex,
+                            committedOffset: offsetManager.pendingOffsets[topic][partitionIndex],
+                            committedLeaderEpoch: -1,
+                            committedMetadata: null,
+                        })),
                 })),
-            })),
         };
         if (!request.topics.length) {
             return;

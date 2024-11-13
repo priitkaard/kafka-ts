@@ -44,10 +44,10 @@ export class Metadata {
         topics,
         allowTopicAutoCreation,
     }: {
-        topics: string[];
+        topics: string[] | Set<string>;
         allowTopicAutoCreation: boolean;
     }) {
-        const missingTopics = topics.filter((topic) => !this.topicPartitions[topic]);
+        const missingTopics = Array.from(topics).filter((topic) => !this.topicPartitions[topic]);
         if (!missingTopics.length) {
             return;
         }
@@ -73,14 +73,14 @@ export class Metadata {
         topics,
         allowTopicAutoCreation,
     }: {
-        topics: string[] | null;
+        topics: string[] | Set<string> | null;
         allowTopicAutoCreation: boolean;
     }) {
         const { cluster } = this.options;
 
         const response = await cluster.sendRequest(API.METADATA, {
             allowTopicAutoCreation,
-            topics: topics?.map((name) => ({ id: null, name })) ?? null,
+            topics: topics ? Array.from(topics).map((name) => ({ id: null, name })) : null,
         });
 
         this.topicPartitions = {
