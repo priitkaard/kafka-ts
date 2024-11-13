@@ -1,4 +1,3 @@
-import { findCodec } from '../codecs';
 import { createApi } from '../utils/api';
 import { Decoder } from '../utils/decoder';
 import { KafkaTSApiError, KafkaTSError } from '../utils/error';
@@ -107,28 +106,7 @@ export const FETCH = createApi({
             });
         });
 
-        const decompressedResponses = await Promise.all(
-            result.responses.map(async (response) => ({
-                ...response,
-                partitions: await Promise.all(
-                    response.partitions.map(async (partition) => ({
-                        ...partition,
-                        records: await Promise.all(
-                            partition.records.map(async ({ recordsLength, compressedRecords, ...record }) => {
-                                const { decompress } = findCodec(record.compression);
-                                const decompressedRecords = await decompress(compressedRecords);
-                                const decompressedDecoder = new Decoder(
-                                    Buffer.concat([recordsLength, decompressedRecords]),
-                                );
-                                return { ...record, records: decodeRecord(decompressedDecoder) };
-                            }),
-                        ),
-                    })),
-                ),
-            })),
-        );
-
-        return { ...result, responses: decompressedResponses };
+        return result;
     },
 });
 
@@ -151,7 +129,7 @@ const decodeRecordBatch = (decoder: Decoder) => {
         if (!recordBatchDecoder.canReadBytes(batchLength)) {
             // likely running into maxBytes limit
             log.debug('Record batch is incomplete, skipping last batch.');
-            recordBatchDecoder.read()
+            recordBatchDecoder.read();
             continue;
         }
 
@@ -181,8 +159,7 @@ const decodeRecordBatch = (decoder: Decoder) => {
         const producerId = batchDecoder.readInt64();
         const producerEpoch = batchDecoder.readInt16();
         const baseSequence = batchDecoder.readInt32();
-        const recordsLength = batchDecoder.read(4);
-        const compressedRecords = batchDecoder.read();
+        const records = decodeRecords(batchDecoder);
 
         results.push({
             baseOffset,
@@ -202,14 +179,13 @@ const decodeRecordBatch = (decoder: Decoder) => {
             producerId,
             producerEpoch,
             baseSequence,
-            recordsLength,
-            compressedRecords,
+            records,
         });
     }
     return results;
 };
 
-const decodeRecord = (decoder: Decoder) =>
+const decodeRecords = (decoder: Decoder) =>
     decoder.readRecords((record) => ({
         attributes: record.readInt8(),
         timestampDelta: record.readVarLong(),

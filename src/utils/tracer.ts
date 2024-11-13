@@ -33,7 +33,7 @@ class DebugTracer implements Tracer {
 
 let tracer: Tracer = new DebugTracer();
 
-export const setTracer = <T>(newTracer: Tracer) => {
+export const setTracer = (newTracer: Tracer) => {
     tracer = newTracer;
 };
 
