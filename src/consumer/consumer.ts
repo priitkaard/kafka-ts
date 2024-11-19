@@ -61,7 +61,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             minBytes: options.minBytes ?? 1,
             maxBytes: options.maxBytes ?? 1_048_576,
             partitionMaxBytes: options.partitionMaxBytes ?? 1_048_576,
-            isolationLevel: options.isolationLevel ?? IsolationLevel.READ_UNCOMMITTED,
+            isolationLevel: options.isolationLevel ?? IsolationLevel.READ_COMMITTED,
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
             fromBeginning: options.fromBeginning ?? false,
             fromTimestamp: options.fromTimestamp ?? (options.fromBeginning ? -2n : -1n),
@@ -235,7 +235,17 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
         }
 
         await retrier(() => options.onBatch(messages));
-        messages.forEach(({ topic, partition, offset }) => this.offsetManager.resolve(topic, partition, offset + 1n));
+        response.responses.forEach(({ topicId, partitions }) => {
+            partitions.forEach(({ partitionIndex, records }) => {
+                records.forEach(({ baseOffset, lastOffsetDelta }) => {
+                    this.offsetManager.resolve(
+                        this.metadata.getTopicNameById(topicId),
+                        partitionIndex,
+                        baseOffset + BigInt(lastOffsetDelta) + 1n,
+                    );
+                });
+            });
+        });
 
         await this.consumerGroup?.offsetCommit(topicPartitions);
         this.offsetManager.flush(topicPartitions);
@@ -260,7 +270,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                     currentLeaderEpoch: -1,
                     fetchOffset: this.offsetManager.getCurrentOffset(topic, partition),
                     lastFetchedEpoch: -1,
-                    logStartOffset: 0n,
+                    logStartOffset: -1n,
                     partitionMaxBytes,
                 })),
             })),
