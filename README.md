@@ -141,6 +141,7 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 | bootstrapServers | TcpSocketConnectOpts[] | true     |         | List of kafka brokers for initial cluster discovery. |
 | sasl             | SASLProvider           | false    |         | SASL provider                                        |
 | ssl              | TLSSocketOptions       | false    |         | SSL configuration.                                   |
+| requestTimeout   | number                 | false    | 60000   | Request timeout in milliseconds.                     |
 
 #### Supported SASL mechanisms
 

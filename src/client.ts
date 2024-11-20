@@ -10,6 +10,7 @@ export type ClientOptions = {
     bootstrapServers: TcpSocketConnectOpts[];
     sasl?: SASLProvider | null;
     ssl?: TLSSocketOptions | null;
+    requestTimeout?: number;
 };
 
 export class Client {
@@ -21,6 +22,7 @@ export class Client {
             clientId: options.clientId ?? null,
             sasl: options.sasl ?? null,
             ssl: options.ssl ?? null,
+            requestTimeout: options.requestTimeout ?? 60_000,
         };
     }
 
@@ -40,6 +42,7 @@ export class Client {
             bootstrapServers: this.options.bootstrapServers,
             sasl: this.options.sasl,
             ssl: this.options.ssl,
+            requestTimeout: this.options.requestTimeout,
         });
     }
 }

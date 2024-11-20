@@ -12,6 +12,7 @@ type ClusterOptions = {
     bootstrapServers: TcpSocketConnectOpts[];
     sasl: SASLProvider | null;
     ssl: TLSSocketOptions | null;
+    requestTimeout: number;
 };
 
 export class Cluster {
@@ -70,6 +71,7 @@ export class Cluster {
             clientId: this.options.clientId,
             sasl: this.options.sasl,
             ssl: this.options.ssl,
+            requestTimeout: this.options.requestTimeout,
             options: this.brokerMetadata[nodeId],
         });
         await broker.connect();
@@ -80,10 +82,11 @@ export class Cluster {
         const randomizedBrokers = this.options.bootstrapServers.toSorted(() => Math.random() - 0.5);
         for (const options of randomizedBrokers) {
             try {
-                const broker = await new Broker({
+                const broker = new Broker({
                     clientId: this.options.clientId,
                     sasl: this.options.sasl,
                     ssl: this.options.ssl,
+                    requestTimeout: this.options.requestTimeout,
                     options,
                 });
                 await broker.connect();

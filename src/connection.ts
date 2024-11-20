@@ -15,6 +15,7 @@ type ConnectionOptions = {
     clientId: string | null;
     connection: TcpSocketConnectOpts;
     ssl: TLSSocketOptions | null;
+    requestTimeout: number;
 };
 
 type RawResonse = { responseDecoder: Decoder; responseSize: number };
@@ -94,7 +95,7 @@ export class Connection {
             timeout = setTimeout(() => {
                 delete this.queue[correlationId];
                 reject(new ConnectionError(`${apiName} timed out`));
-            }, 30_000);
+            }, this.options.requestTimeout);
 
             try {
                 this.queue[correlationId] = { resolve, reject };

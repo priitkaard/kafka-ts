@@ -14,6 +14,7 @@ type BrokerOptions = {
     options: TcpSocketConnectOpts;
     sasl: SASLProvider | null;
     ssl: TLSSocketOptions | null;
+    requestTimeout: number;
 };
 
 export class Broker {
@@ -25,6 +26,7 @@ export class Broker {
             clientId: this.options.clientId,
             connection: this.options.options,
             ssl: this.options.ssl,
+            requestTimeout: this.options.requestTimeout,
         });
         this.sendRequest = this.connection.sendRequest.bind(this.connection);
     }
