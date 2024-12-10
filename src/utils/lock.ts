@@ -23,7 +23,7 @@ export class Lock extends EventEmitter {
             await new Promise<void>((resolve) => {
                 const timeout = setTimeout(() => {
                     log.warn(`Lock timed out`, { key });
-                    this.emit(`release:${key}`);
+                    this.releaseKey(key);
                 }, 10_000);
 
                 this.once(`release:${key}`, () => {
