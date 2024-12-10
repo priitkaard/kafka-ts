@@ -48,7 +48,9 @@ export class Producer {
         const defaultTimestamp = BigInt(Date.now());
 
         const topics = new Set(messages.map((message) => message.topic));
-        await this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation });
+        await this.lock.acquire([...topics], async () => {
+            await this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation });
+        });
 
         const partitionedMessages = messages.map((message) => {
             message.partition = this.partition(message);
