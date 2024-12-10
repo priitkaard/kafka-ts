@@ -7,6 +7,8 @@ import { Message } from '../types';
 import { delay } from '../utils/delay';
 import { KafkaTSApiError } from '../utils/error';
 import { Lock } from '../utils/lock';
+import { log } from '../utils/logger';
+import { shared } from '../utils/shared';
 import { createTracer } from '../utils/tracer';
 
 const trace = createTracer('Producer');
@@ -127,6 +129,13 @@ export class Producer {
             if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.OUT_OF_ORDER_SEQUENCE_NUMBER) {
                 await this.initProducerId();
             }
+            log.warn('Reconnecting producer due to an unhandled error', { error });
+            try {
+                await this.cluster.disconnect();
+                await this.cluster.connect();
+            } catch (error) {
+                log.warn('Failed to reconnect producer', { error });
+            }
             throw error;
         }
     }
@@ -135,12 +144,12 @@ export class Producer {
         await this.cluster.disconnect();
     }
 
-    private async ensureConnected() {
+    private ensureConnected = shared(async () => {
         await this.cluster.ensureConnected();
         if (!this.producerId) {
             await this.initProducerId();
         }
-    }
+    });
 
     private async initProducerId(): Promise<void> {
         try {

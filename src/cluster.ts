@@ -67,6 +67,9 @@ export class Cluster {
         };
 
     public async acquireBroker(nodeId: number) {
+        if (!(nodeId in this.brokerMetadata)) {
+            throw new KafkaTSError(`Broker ${nodeId} is not available`);
+        }
         const broker = new Broker({
             clientId: this.options.clientId,
             sasl: this.options.sasl,
