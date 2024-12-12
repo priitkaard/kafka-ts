@@ -24,7 +24,7 @@ export class Lock extends EventEmitter {
                 const timeout = setTimeout(() => {
                     log.warn(`Lock timed out`, { key });
                     this.releaseKey(key);
-                }, 10_000);
+                }, 60_000);
 
                 this.once(`release:${key}`, () => {
                     clearTimeout(timeout);

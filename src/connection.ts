@@ -56,6 +56,7 @@ export class Connection {
         });
         this.socket.removeAllListeners('error');
 
+        this.socket.on('error', error => log.debug('Socket error', { error }));
         this.socket.on('data', (data) => this.handleData(data));
         this.socket.once('close', async () => {
             Object.values(this.queue).forEach(({ reject }) => {

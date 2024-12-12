@@ -113,7 +113,7 @@ export class Producer {
                         await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
                             transactionalId: null,
                             acks,
-                            timeoutMs: 5000,
+                            timeoutMs: 30000,
                             topicData,
                         });
                         topicData.forEach(({ name, partitionData }) => {
