@@ -48,9 +48,10 @@ export class Producer {
         const defaultTimestamp = BigInt(Date.now());
 
         const topics = new Set(messages.map((message) => message.topic));
-        await this.lock.acquire([...topics], async () => {
-            await this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation });
-        });
+        await this.lock.acquire(
+            [...topics].map((topic) => `metadata:${topic}`),
+            () => this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation }),
+        );
 
         const partitionedMessages = messages.map((message) => {
             message.partition = this.partition(message);
@@ -65,10 +66,7 @@ export class Producer {
         try {
             await Promise.all(
                 Object.entries(nodeTopicPartitionMessages).map(async ([nodeId, topicPartitionMessages]) => {
-                    const lockKeys = Object.entries(topicPartitionMessages).flatMap(([topic, partitionMessages]) =>
-                        Object.entries(partitionMessages).map(([partition]) => `${topic}-${partition}`),
-                    );
-                    await this.lock.acquire(lockKeys, async () => {
+                    await this.lock.acquire([`node:${nodeId}`], async () => {
                         const topicData = Object.entries(topicPartitionMessages).map(([topic, partitionMessages]) => ({
                             name: topic,
                             partitionData: Object.entries(partitionMessages).map(([partition, messages]) => {
