@@ -24,9 +24,20 @@ export class OffsetManager {
         return this.currentOffsets[topic]?.[partition] ?? 0n;
     }
 
+    public getPendingOffset(topic: string, partition: number) {
+        return this.pendingOffsets[topic]?.[partition] ?? 0n;
+    }
+
     public resolve(topic: string, partition: number, offset: bigint) {
         this.pendingOffsets[topic] ??= {};
         this.pendingOffsets[topic][partition] = offset;
+    }
+
+    public isResolved(message: { topic: string; partition: number; offset: bigint }) {
+        return (
+            this.getCurrentOffset(message.topic, message.partition) > message.offset ||
+            this.getPendingOffset(message.topic, message.partition) > message.offset
+        );
     }
 
     public flush(topicPartitions: Record<string, Set<number>>) {

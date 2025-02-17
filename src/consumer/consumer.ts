@@ -33,7 +33,12 @@ export type ConsumerOptions = {
     fromBeginning?: boolean;
     fromTimestamp?: bigint;
     retrier?: Retrier;
-    onBatch: (messages: Required<Message>[]) => unknown;
+    onBatch: (
+        messages: Required<Message>[],
+        context: {
+            resolveOffset: (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) => void;
+        },
+    ) => unknown;
 };
 
 export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> {
@@ -234,7 +239,24 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             return;
         }
 
-        await retrier(() => options.onBatch(messages));
+        const resolveOffset = (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) =>
+            this.offsetManager.resolve(message.topic, message.partition, message.offset + 1n);
+
+        try {
+            await retrier(() =>
+                options.onBatch(
+                    messages.filter((message) => !this.offsetManager.isResolved(message)),
+                    { resolveOffset },
+                ),
+            );
+        } catch (error) {
+            await this.consumerGroup
+                ?.offsetCommit(topicPartitions)
+                .then(() => this.offsetManager.flush(topicPartitions))
+                .catch();
+            throw error;
+        }
+
         response.responses.forEach(({ topicId, partitions }) => {
             partitions.forEach(({ partitionIndex, records }) => {
                 records.forEach(({ baseOffset, lastOffsetDelta }) => {
@@ -246,7 +268,6 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 });
             });
         });
-
         await this.consumerGroup?.offsetCommit(topicPartitions);
         this.offsetManager.flush(topicPartitions);
     }
