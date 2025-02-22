@@ -127,8 +127,7 @@ const decodeRecordBatch = (decoder: Decoder) => {
         }
 
         if (!recordBatchDecoder.canReadBytes(batchLength)) {
-            // likely running into maxBytes limit
-            log.debug('Record batch is incomplete, skipping last batch.');
+            // running into maxBytes limit
             recordBatchDecoder.read();
             continue;
         }
