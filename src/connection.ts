@@ -56,7 +56,7 @@ export class Connection {
         });
         this.socket.removeAllListeners('error');
 
-        this.socket.on('error', error => log.debug('Socket error', { error }));
+        this.socket.on('error', (error) => log.debug('Socket error', { error }));
         this.socket.on('data', (data) => this.handleData(data));
         this.socket.once('close', async () => {
             Object.values(this.queue).forEach(({ reject }) => {
@@ -111,8 +111,8 @@ export class Connection {
             const response = await api.response(responseDecoder);
 
             assert(
-                responseDecoder.getOffset() - 4 === responseSize,
-                `Buffer not correctly consumed: ${responseDecoder.getOffset() - 4} !== ${responseSize}`,
+                responseDecoder.getOffset() === responseSize,
+                `Buffer not correctly consumed: ${responseDecoder.getOffset()} !== ${responseSize}`,
             );
 
             return response;
@@ -143,25 +143,25 @@ export class Connection {
         this.chunks.push(buffer);
 
         const decoder = new Decoder(Buffer.concat(this.chunks));
-        if (!decoder.canReadBytes(4)) {
-            return;
-        }
+        if (!decoder.canReadBytes(4)) return;
 
-        const size = decoder.readInt32();
-        if (size !== decoder.getBufferLength() - 4) {
-            return;
-        }
+        const responseSize = decoder.readInt32();
+        if (!decoder.canReadBytes(responseSize)) return;
 
-        const correlationId = decoder.readInt32();
+        const responseDecoder = new Decoder(decoder.read(responseSize));
+        const correlationId = responseDecoder.readInt32();
 
         const context = this.queue[correlationId];
         if (context) {
             delete this.queue[correlationId];
-            context.resolve({ responseDecoder: decoder, responseSize: size });
+            context.resolve({ responseDecoder, responseSize });
         } else {
             log.debug('Could not find pending request for correlationId', { correlationId });
         }
         this.chunks = [];
+
+        const remaining = decoder.read();
+        if (remaining.length) this.handleData(remaining);
     }
 
     private nextCorrelationId() {
