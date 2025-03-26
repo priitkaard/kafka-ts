@@ -52,6 +52,7 @@ export class Connection {
                       resolve,
                   )
                 : net.connect(connection, resolve);
+            this.socket.setKeepAlive(true, 30_000);
             this.socket.once('error', reject);
         });
         this.socket.removeAllListeners('error');
