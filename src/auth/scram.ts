@@ -36,7 +36,7 @@ const saslScram =
             const clientKey = hmac(saltedPassword, 'Client Key', digest);
             const clientKeyHash = hash(clientKey, digest);
 
-            let finalMessage = `c=${base64Encode('n,,')},r=${rnonce}`;
+            let finalMessage = `c=${base64Encode(Buffer.from('n,,'))},r=${rnonce}`;
 
             const fullMessage = `${firstMessage},${authBytes.toString()},${finalMessage}`;
             const clientSignature = hmac(clientKeyHash, fullMessage, digest);
