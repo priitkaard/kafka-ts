@@ -10,7 +10,7 @@ import { KafkaTSApiError } from './utils/error';
 
 const kafka = createKafkaClient({
     clientId: 'kafka-ts',
-    bootstrapServers: [{ host: 'localhost', port: 9092 }],
+    bootstrapServers: [{ host: 'localhost', port: 39092 }],
     sasl: saslPlain({ username: 'admin', password: 'admin' }),
     ssl: { ca: readFileSync('./certs/ca.crt').toString() },
 });

@@ -3,7 +3,7 @@ import { Kafka } from 'kafkajs';
 import { startBenchmarker } from './common';
 
 const kafkajs = new Kafka({
-    brokers: ['localhost:9092'],
+    brokers: ['localhost:39092'],
     clientId: 'kafkajs',
     sasl: { username: 'admin', password: 'admin', mechanism: 'plain' },
     ssl: { ca: readFileSync('../certs/ca.crt').toString() },

@@ -4,7 +4,7 @@ services:
         container_name: kafka-0
         image: apache/kafka:${KAFKA_VERSION}
         ports:
-            - '9092:9092'
+            - '39092:39092'
             - '29092:29092'
         environment:
             KAFKA_NODE_ID: 0
@@ -13,10 +13,10 @@ services:
             KAFKA_LISTENER_NAME_EXTERNAL_SCRAM-SHA-256_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.scram.ScramLoginModule required;'
             KAFKA_LISTENER_NAME_EXTERNAL_SCRAM-SHA-512_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.scram.ScramLoginModule required;'
             KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN,SCRAM-SHA-256,SCRAM-SHA-512'
-            KAFKA_ADVERTISED_LISTENERS: 'EXTERNAL://localhost:9092,INTERBROKER://kafka-0:19092'
+            KAFKA_ADVERTISED_LISTENERS: 'EXTERNAL://localhost:39092,INTERBROKER://kafka-0:19092'
             KAFKA_PROCESS_ROLES: 'broker,controller'
             KAFKA_CONTROLLER_QUORUM_VOTERS: '0@kafka-0:29092,1@kafka-1:29093,2@kafka-2:29094'
-            KAFKA_LISTENERS: 'EXTERNAL://:9092,INTERBROKER://:19092,CONTROLLER://:29092'
+            KAFKA_LISTENERS: 'EXTERNAL://:39092,INTERBROKER://:19092,CONTROLLER://:29092'
             KAFKA_INTER_BROKER_LISTENER_NAME: 'INTERBROKER'
             KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
             CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
@@ -40,7 +40,7 @@ services:
         container_name: kafka-1
         image: apache/kafka:${KAFKA_VERSION}
         ports:
-            - '9093:9093'
+            - '39093:39093'
             - '29093:29093'
         environment:
             KAFKA_NODE_ID: 1
@@ -49,10 +49,10 @@ services:
             KAFKA_LISTENER_NAME_EXTERNAL_SCRAM-SHA-256_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.scram.ScramLoginModule required;'
             KAFKA_LISTENER_NAME_EXTERNAL_SCRAM-SHA-512_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.scram.ScramLoginModule required;'
             KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN,SCRAM-SHA-256,SCRAM-SHA-512'
-            KAFKA_ADVERTISED_LISTENERS: 'EXTERNAL://localhost:9093,INTERBROKER://kafka-1:19093'
+            KAFKA_ADVERTISED_LISTENERS: 'EXTERNAL://localhost:39092,INTERBROKER://kafka-1:19093'
             KAFKA_PROCESS_ROLES: 'broker,controller'
             KAFKA_CONTROLLER_QUORUM_VOTERS: '0@kafka-0:29092,1@kafka-1:29093,2@kafka-2:29094'
-            KAFKA_LISTENERS: 'EXTERNAL://:9093,INTERBROKER://:19093,CONTROLLER://:29093'
+            KAFKA_LISTENERS: 'EXTERNAL://:39092,INTERBROKER://:19093,CONTROLLER://:29093'
             KAFKA_INTER_BROKER_LISTENER_NAME: 'INTERBROKER'
             KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
             CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
@@ -76,7 +76,7 @@ services:
         container_name: kafka-2
         image: apache/kafka:${KAFKA_VERSION}
         ports:
-            - '9094:9094'
+            - '39094:39094'
             - '29094:29094'
         environment:
             KAFKA_NODE_ID: 2
@@ -85,10 +85,10 @@ services:
             KAFKA_LISTENER_NAME_EXTERNAL_SCRAM-SHA-256_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.scram.ScramLoginModule required;'
             KAFKA_LISTENER_NAME_EXTERNAL_SCRAM-SHA-512_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.scram.ScramLoginModule required;'
             KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN,SCRAM-SHA-256,SCRAM-SHA-512'
-            KAFKA_ADVERTISED_LISTENERS: 'EXTERNAL://localhost:9094,INTERBROKER://kafka-2:19094'
+            KAFKA_ADVERTISED_LISTENERS: 'EXTERNAL://localhost:39094,INTERBROKER://kafka-2:19094'
             KAFKA_PROCESS_ROLES: 'broker,controller'
             KAFKA_CONTROLLER_QUORUM_VOTERS: '0@kafka-0:29092,1@kafka-1:29093,2@kafka-2:29094'
-            KAFKA_LISTENERS: 'EXTERNAL://:9094,INTERBROKER://:19094,CONTROLLER://:29094'
+            KAFKA_LISTENERS: 'EXTERNAL://:39094,INTERBROKER://:19094,CONTROLLER://:29094'
             KAFKA_INTER_BROKER_LISTENER_NAME: 'INTERBROKER'
             KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
             CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'

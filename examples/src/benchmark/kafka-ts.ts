@@ -5,7 +5,7 @@ import { startBenchmarker } from './common';
 // setTracer(new OpenTelemetryTracer());
 
 const kafka = createKafkaClient({
-    bootstrapServers: [{ host: 'localhost', port: 9092 }],
+    bootstrapServers: [{ host: 'localhost', port: 39092 }],
     clientId: 'kafka-ts',
     sasl: saslScramSha512({ username: 'admin', password: 'admin' }),
     ssl: { ca: readFileSync('../certs/ca.crt').toString() },
