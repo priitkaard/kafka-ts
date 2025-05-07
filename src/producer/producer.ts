@@ -5,7 +5,7 @@ import { defaultPartitioner, Partition, Partitioner } from '../distributors/part
 import { Metadata } from '../metadata';
 import { Message } from '../types';
 import { delay } from '../utils/delay';
-import { KafkaTSApiError } from '../utils/error';
+import { BrokerNotAvailableError, KafkaTSApiError } from '../utils/error';
 import { Lock } from '../utils/lock';
 import { log } from '../utils/logger';
 import { shared } from '../utils/shared';
@@ -108,12 +108,23 @@ export class Producer {
                                 };
                             }),
                         }));
-                        await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
-                            transactionalId: null,
-                            acks,
-                            timeoutMs: 30000,
-                            topicData,
-                        });
+                        try {
+                            await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
+                                transactionalId: null,
+                                acks,
+                                timeoutMs: 30000,
+                                topicData,
+                            });
+                        } catch (error) {
+                            if (error instanceof BrokerNotAvailableError) {
+                                log.debug('Broker not available, refreshing metadata');
+                                await this.cluster.refreshBrokerMetadata();
+                                await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation });
+                                const messages = Object.values(topicPartitionMessages).flatMap(partitionMessages => Object.values(partitionMessages).flat()).map(({ partition, ...message }) => message);
+                                return this.send(messages, { acks });
+                            }
+                            throw error;
+                        }
                         topicData.forEach(({ name, partitionData }) => {
                             partitionData.forEach(({ index, records }) => {
                                 this.updateSequence(name, index, records.length);

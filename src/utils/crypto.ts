@@ -7,7 +7,7 @@ export const saltPassword = (password: string, salt: string, iterations: number,
         pbkdf2(password, salt, iterations, keyLength, digest, (err, key) => (err ? reject(err) : resolve(key))),
     );
 
-export const base64Encode = (input: Buffer | string) => Buffer.from(input).toString('base64');
+export const base64Encode = (input: Buffer) => Buffer.from(input).toString('base64');
 export const base64Decode = (input: string) => Buffer.from(input, 'base64').toString();
 export const hash = (data: Buffer, digest: string) => createHash(digest).update(data).digest();
 export const hmac = (key: Buffer, data: Buffer | string, digest: string) =>
