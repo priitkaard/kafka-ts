@@ -4,7 +4,7 @@ import { API } from './api';
 import { Metadata } from './api/metadata';
 import { Broker, SASLProvider } from './broker';
 import { SendRequest } from './connection';
-import { KafkaTSError } from './utils/error';
+import { BrokerNotAvailableError, KafkaTSError } from './utils/error';
 import { log } from './utils/logger';
 
 type ClusterOptions = {
@@ -26,6 +26,10 @@ export class Cluster {
         this.seedBroker = await this.findSeedBroker();
         this.brokerById = {};
 
+        await this.refreshBrokerMetadata();
+    }
+    
+    public async refreshBrokerMetadata() {
         const metadata = await this.sendRequest(API.METADATA, { topics: [] });
         this.brokerMetadata = Object.fromEntries(metadata.brokers.map((options) => [options.nodeId, options]));
     }
@@ -68,7 +72,7 @@ export class Cluster {
 
     public async acquireBroker(nodeId: number) {
         if (!(nodeId in this.brokerMetadata)) {
-            throw new KafkaTSError(`Broker ${nodeId} is not available`);
+            throw new BrokerNotAvailableError(nodeId);
         }
         const broker = new Broker({
             clientId: this.options.clientId,
