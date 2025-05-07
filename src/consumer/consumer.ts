@@ -272,31 +272,40 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
         this.offsetManager.flush(topicPartitions);
     }
 
-    private fetch(nodeId: number, assignment: Assignment) {
+    private async fetch(nodeId: number, assignment: Assignment): Promise<FetchResponse> {
         const { rackId, maxWaitMs, minBytes, maxBytes, partitionMaxBytes, isolationLevel } = this.options;
 
         this.consumerGroup?.handleLastHeartbeat();
 
-        return this.cluster.sendRequestToNode(nodeId)(API.FETCH, {
-            maxWaitMs,
-            minBytes,
-            maxBytes,
-            isolationLevel,
-            sessionId: 0,
-            sessionEpoch: -1,
-            topics: Object.entries(assignment).map(([topic, partitions]) => ({
-                topicId: this.metadata.getTopicIdByName(topic),
-                partitions: partitions.map((partition) => ({
-                    partition,
-                    currentLeaderEpoch: -1,
-                    fetchOffset: this.offsetManager.getCurrentOffset(topic, partition),
-                    lastFetchedEpoch: -1,
-                    logStartOffset: -1n,
-                    partitionMaxBytes,
+        try {
+            return await this.cluster.sendRequestToNode(nodeId)(API.FETCH, {
+                maxWaitMs,
+                minBytes,
+                maxBytes,
+                isolationLevel,
+                sessionId: 0,
+                sessionEpoch: -1,
+                topics: Object.entries(assignment).map(([topic, partitions]) => ({
+                    topicId: this.metadata.getTopicIdByName(topic),
+                    partitions: partitions.map((partition) => ({
+                        partition,
+                        currentLeaderEpoch: -1,
+                        fetchOffset: this.offsetManager.getCurrentOffset(topic, partition),
+                        lastFetchedEpoch: -1,
+                        logStartOffset: -1n,
+                        partitionMaxBytes,
+                    })),
                 })),
-            })),
-            forgottenTopicsData: [],
-            rackId,
-        });
+                forgottenTopicsData: [],
+                rackId,
+            });
+        } catch (error) {
+            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.OFFSET_OUT_OF_RANGE) {
+                log.warn('Offset out of range. Resetting offsets.');
+                await this.offsetManager.fetchOffsets({ fromTimestamp: this.options.fromTimestamp });
+                return this.fetch(nodeId, assignment);
+            }
+            throw error;
+        }
     }
 }
