@@ -6,6 +6,9 @@ import { Broker, SASLProvider } from './broker';
 import { SendRequest } from './connection';
 import { BrokerNotAvailableError, KafkaTSError } from './utils/error';
 import { log } from './utils/logger';
+import { createTracer } from './utils/tracer';
+
+const trace = createTracer('Cluster');
 
 type ClusterOptions = {
     clientId: string | null;
@@ -70,6 +73,7 @@ export class Cluster {
             return this.brokerById[nodeId].sendRequest(...args);
         };
 
+    @trace((nodeId) => ({ nodeId, result: `<Broker ${nodeId}>` }))
     public async acquireBroker(nodeId: number) {
         if (!(nodeId in this.brokerMetadata)) {
             throw new BrokerNotAvailableError(nodeId);

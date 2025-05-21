@@ -66,71 +66,71 @@ export class Producer {
         try {
             await Promise.all(
                 Object.entries(nodeTopicPartitionMessages).map(async ([nodeId, topicPartitionMessages]) => {
-                    await this.lock.acquire([`node:${nodeId}`], async () => {
-                        const topicData = Object.entries(topicPartitionMessages).map(([topic, partitionMessages]) => ({
-                            name: topic,
-                            partitionData: Object.entries(partitionMessages).map(([partition, messages]) => {
-                                const partitionIndex = parseInt(partition);
-                                let baseTimestamp: bigint | undefined;
-                                let maxTimestamp: bigint | undefined;
-
-                                messages.forEach(({ timestamp = defaultTimestamp }) => {
-                                    if (!baseTimestamp || timestamp < baseTimestamp) {
-                                        baseTimestamp = timestamp;
-                                    }
-                                    if (!maxTimestamp || timestamp > maxTimestamp) {
-                                        maxTimestamp = timestamp;
-                                    }
-                                });
-
-                                return {
-                                    index: partitionIndex,
-                                    baseOffset: 0n,
-                                    partitionLeaderEpoch: -1,
-                                    attributes: 0,
-                                    lastOffsetDelta: messages.length - 1,
-                                    baseTimestamp: baseTimestamp ?? 0n,
-                                    maxTimestamp: maxTimestamp ?? 0n,
-                                    producerId: this.producerId,
-                                    producerEpoch: 0,
-                                    baseSequence: this.getSequence(topic, partitionIndex),
-                                    records: messages.map((message, index) => ({
+                    try {
+                        await this.lock.acquire([`node:${nodeId}`], async () => {
+                            const topicData = Object.entries(topicPartitionMessages).map(([topic, partitionMessages]) => ({
+                                name: topic,
+                                partitionData: Object.entries(partitionMessages).map(([partition, messages]) => {
+                                    const partitionIndex = parseInt(partition);
+                                    let baseTimestamp: bigint | undefined;
+                                    let maxTimestamp: bigint | undefined;
+    
+                                    messages.forEach(({ timestamp = defaultTimestamp }) => {
+                                        if (!baseTimestamp || timestamp < baseTimestamp) {
+                                            baseTimestamp = timestamp;
+                                        }
+                                        if (!maxTimestamp || timestamp > maxTimestamp) {
+                                            maxTimestamp = timestamp;
+                                        }
+                                    });
+    
+                                    return {
+                                        index: partitionIndex,
+                                        baseOffset: 0n,
+                                        partitionLeaderEpoch: -1,
                                         attributes: 0,
-                                        timestampDelta: (message.timestamp ?? defaultTimestamp) - (baseTimestamp ?? 0n),
-                                        offsetDelta: index,
-                                        key: message.key ?? null,
-                                        value: message.value,
-                                        headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({
-                                            key,
-                                            value,
+                                        lastOffsetDelta: messages.length - 1,
+                                        baseTimestamp: baseTimestamp ?? 0n,
+                                        maxTimestamp: maxTimestamp ?? 0n,
+                                        producerId: this.producerId,
+                                        producerEpoch: 0,
+                                        baseSequence: this.getSequence(topic, partitionIndex),
+                                        records: messages.map((message, index) => ({
+                                            attributes: 0,
+                                            timestampDelta: (message.timestamp ?? defaultTimestamp) - (baseTimestamp ?? 0n),
+                                            offsetDelta: index,
+                                            key: message.key ?? null,
+                                            value: message.value,
+                                            headers: Object.entries(message.headers ?? {}).map(([key, value]) => ({
+                                                key,
+                                                value,
+                                            })),
                                         })),
-                                    })),
-                                };
-                            }),
-                        }));
-                        try {
-                            await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
-                                transactionalId: null,
-                                acks,
-                                timeoutMs: 30000,
-                                topicData,
-                            });
-                        } catch (error) {
-                            if (error instanceof BrokerNotAvailableError) {
-                                log.debug('Broker not available, refreshing metadata');
-                                await this.cluster.refreshBrokerMetadata();
-                                await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation });
-                                const messages = Object.values(topicPartitionMessages).flatMap(partitionMessages => Object.values(partitionMessages).flat()).map(({ partition, ...message }) => message);
-                                return this.send(messages, { acks });
-                            }
-                            throw error;
-                        }
-                        topicData.forEach(({ name, partitionData }) => {
-                            partitionData.forEach(({ index, records }) => {
-                                this.updateSequence(name, index, records.length);
+                                    };
+                                }),
+                            }));
+                                await this.cluster.sendRequestToNode(parseInt(nodeId))(API.PRODUCE, {
+                                    transactionalId: null,
+                                    acks,
+                                    timeoutMs: 30000,
+                                    topicData,
+                                });
+                            topicData.forEach(({ name, partitionData }) => {
+                                partitionData.forEach(({ index, records }) => {
+                                    this.updateSequence(name, index, records.length);
+                                });
                             });
                         });
-                    });
+                    } catch (error) {
+                        if (error instanceof BrokerNotAvailableError || (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_LEADER_OR_FOLLOWER)) {
+                            log.debug('Refreshing broker metadata', { reason: error.message, nodeId });
+                            await this.cluster.refreshBrokerMetadata();
+                            await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation });
+                            const messages = Object.values(topicPartitionMessages).flatMap(partitionMessages => Object.values(partitionMessages).flat()).map(({ partition, ...message }) => message);
+                            return this.send(messages, { acks });
+                        }
+                        throw error;
+                    }
                 }),
             );
         } catch (error) {

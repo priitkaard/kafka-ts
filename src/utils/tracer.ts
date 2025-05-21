@@ -16,8 +16,8 @@ class DebugTracer implements Tracer {
 
         const onEnd = <T>(result: T): T => {
             log.debug(`[${module}.${method}] ${metadata?.message ?? ''} +${Date.now() - startTime}ms`, {
-                ...metadata,
                 ...(!!result && { result }),
+                ...metadata,
             });
             return result;
         };
