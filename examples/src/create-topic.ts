@@ -19,12 +19,13 @@ import { kafka } from './client';
                 {
                     name: 'my-topic',
                     numPartitions: 10,
-                    replicationFactor: 1,
+                    replicationFactor: 3,
                     assignments: [],
                     configs: [],
                 },
             ],
         });
+        await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch (error) {
         if ((error as KafkaTSApiError).errorCode !== API_ERROR.TOPIC_ALREADY_EXISTS) {
             throw error;
