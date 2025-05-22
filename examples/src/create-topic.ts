@@ -27,7 +27,7 @@ import { kafka } from './client';
         });
         await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch (error) {
-        if ((error as KafkaTSApiError).errorCode !== API_ERROR.TOPIC_ALREADY_EXISTS) {
+        if (error instanceof KafkaTSApiError && error.errorCode !== API_ERROR.TOPIC_ALREADY_EXISTS) {
             throw error;
         }
     }

@@ -32,17 +32,13 @@ export class Broker {
     }
 
     public async connect() {
-        await this.connection.connect();
-        await this.validateApiVersions();
-        await this.saslHandshake();
-        await this.saslAuthenticate();
-        return this;
-    }
-
-    public async ensureConnected() {
         if (!this.connection.isConnected()) {
-            await this.connect();
+            await this.connection.connect();
+            await this.validateApiVersions();
+            await this.saslHandshake();
+            await this.saslAuthenticate();
         }
+        return this;
     }
 
     public async disconnect() {

@@ -1,4 +1,7 @@
 import { Api } from '../utils/api';
+import { delay } from '../utils/delay';
+import { KafkaTSApiError } from '../utils/error';
+import { log } from '../utils/logger';
 import { API_VERSIONS } from './api-versions';
 import { CREATE_TOPICS } from './create-topics';
 import { DELETE_TOPICS } from './delete-topics';
@@ -163,4 +166,24 @@ export const API_ERROR = {
     TELEMETRY_TOO_LARGE: 118,
     INVALID_REGISTRATION: 119,
     TRANSACTION_ABORTABLE: 120,
+} as const;
+
+export const handleApiError = async (error: unknown) => {
+    if (error instanceof KafkaTSApiError) {
+        switch (error.errorCode) {
+            case API_ERROR.LEADER_NOT_AVAILABLE:
+                log.debug('Leader not available yet. Retrying...');
+                return delay(500);
+            case API_ERROR.COORDINATOR_LOAD_IN_PROGRESS:
+                log.debug('Coordinator load in progress. Retrying...');
+                return delay(100);
+            case API_ERROR.COORDINATOR_NOT_AVAILABLE:
+                log.debug('Coordinator not available yet. Retrying...');
+                return delay(100);
+            case API_ERROR.OFFSET_NOT_AVAILABLE:
+                log.debug('Offset not available yet. Retrying...');
+                return delay(100);
+        }
+    }
+    throw error;
 };

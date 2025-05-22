@@ -39,6 +39,8 @@ export class Connection {
         this.queue = {};
         this.chunks = [];
 
+        const { stack } = new Error();
+
         await new Promise<void>((resolve, reject) => {
             const { ssl, connection } = this.options;
 
@@ -53,7 +55,9 @@ export class Connection {
                   )
                 : net.connect(connection, resolve);
             this.socket.setKeepAlive(true, 30_000);
-            this.socket.once('error', reject);
+            this.socket.once('error', (error) => {
+                reject(new ConnectionError(error.message, stack));
+            });
         });
         this.socket.removeAllListeners('error');
 
@@ -61,7 +65,7 @@ export class Connection {
         this.socket.on('data', (data) => this.handleData(data));
         this.socket.once('close', async () => {
             Object.values(this.queue).forEach(({ reject }) => {
-                reject(new ConnectionError('Socket closed unexpectedly'));
+                reject(new ConnectionError('Socket closed unexpectedly', stack));
             });
             this.queue = {};
         });
@@ -92,18 +96,20 @@ export class Connection {
         const request = api.request(encoder, body);
         const requestEncoder = new Encoder().writeInt32(request.getBufferLength()).writeEncoder(request);
 
+        const { stack } = new Error();
+
         let timeout: NodeJS.Timeout | undefined;
         const { responseDecoder, responseSize } = await new Promise<RawResonse>(async (resolve, reject) => {
             timeout = setTimeout(() => {
                 delete this.queue[correlationId];
-                reject(new ConnectionError(`${apiName} timed out`));
+                reject(new ConnectionError(`${apiName} timed out`, stack));
             }, this.options.requestTimeout);
 
             try {
                 this.queue[correlationId] = { resolve, reject };
                 await this.write(requestEncoder.value());
             } catch (error) {
-                reject(error);
+                reject(new ConnectionError((error as Error).message, stack));
             }
         });
         clearTimeout(timeout);
@@ -128,15 +134,7 @@ export class Connection {
 
     private write(buffer: Buffer) {
         return new Promise<void>((resolve, reject) => {
-            const { stack } = new Error('Write error');
-            this.socket.write(buffer, 'binary', (error) => {
-                if (error) {
-                    const err = new ConnectionError(error.message);
-                    err.stack += `\n${stack}`;
-                    return reject(err);
-                }
-                resolve();
-            });
+            this.socket.write(buffer, 'binary', (error) => (error ? reject(error) : resolve()));
         });
     }
 

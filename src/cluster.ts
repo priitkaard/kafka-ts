@@ -4,8 +4,9 @@ import { API } from './api';
 import { Metadata } from './api/metadata';
 import { Broker, SASLProvider } from './broker';
 import { SendRequest } from './connection';
-import { BrokerNotAvailableError, KafkaTSError } from './utils/error';
+import { ConnectionError, KafkaTSError } from './utils/error';
 import { log } from './utils/logger';
+import { shared } from './utils/shared';
 import { createTracer } from './utils/tracer';
 
 const trace = createTracer('Cluster');
@@ -28,26 +29,6 @@ export class Cluster {
     public async connect() {
         this.seedBroker = await this.findSeedBroker();
         this.brokerById = {};
-
-        await this.refreshBrokerMetadata();
-    }
-    
-    public async refreshBrokerMetadata() {
-        const metadata = await this.sendRequest(API.METADATA, { topics: [] });
-        this.brokerMetadata = Object.fromEntries(metadata.brokers.map((options) => [options.nodeId, options]));
-    }
-
-    public async ensureConnected() {
-        if (!this.seedBroker) {
-            return this.connect();
-        }
-        try {
-            await Promise.all([this.seedBroker, ...Object.values(this.brokerById)].map((x) => x.ensureConnected()));
-        } catch {
-            log.warn('Failed to connect to known brokers, reconnecting...');
-            await this.disconnect();
-            return this.connect();
-        }
     }
 
     public async disconnect() {
@@ -57,12 +38,50 @@ export class Cluster {
         ]);
     }
 
+    public ensureConnected = shared(async () => {
+        if (!this.seedBroker) {
+            return this.connect();
+        }
+
+        const brokers = [
+            {
+                broker: this.seedBroker,
+                handleError: async (error: Error) => {
+                    log.debug(`Failed to connect to seed broker. Reconnecting...`, { reason: error.message });
+                    await this.seedBroker?.disconnect();
+                    this.seedBroker = await this.findSeedBroker();
+                },
+            },
+            ...Object.entries(this.brokerById).map(([nodeId, broker]) => ({
+                broker,
+                handleError: async (error: Error) => {
+                    log.debug(`Failed to connect to broker ${nodeId}. Disconnecting...`, { reason: error.message });
+                    await broker.disconnect();
+                    delete this.brokerById[parseInt(nodeId)];
+                },
+            })),
+        ];
+
+        await Promise.all(
+            brokers.map(async ({ broker, handleError }) => {
+                try {
+                    await broker.connect();
+                } catch (error) {
+                    await handleError(error as Error);
+                }
+            }),
+        );
+    });
+
     public setSeedBroker = async (nodeId: number) => {
+        const broker = await this.acquireBroker(nodeId);
         await this.seedBroker?.disconnect();
-        this.seedBroker = await this.acquireBroker(nodeId);
+        this.seedBroker = broker;
     };
 
-    public sendRequest: SendRequest = (...args) => this.seedBroker!.sendRequest(...args);
+    public sendRequest: SendRequest = async (...args) => {
+        return this.seedBroker!.sendRequest(...args);
+    };
 
     public sendRequestToNode =
         (nodeId: number): SendRequest =>
@@ -75,9 +94,9 @@ export class Cluster {
 
     @trace((nodeId) => ({ nodeId, result: `<Broker ${nodeId}>` }))
     public async acquireBroker(nodeId: number) {
-        if (!(nodeId in this.brokerMetadata)) {
-            throw new BrokerNotAvailableError(nodeId);
-        }
+        if (!(nodeId in this.brokerMetadata)) await this.refreshBrokerMetadata();
+        if (!(nodeId in this.brokerMetadata)) throw new ConnectionError(`Broker ${nodeId} is not available`);
+
         const broker = new Broker({
             clientId: this.options.clientId,
             sasl: this.options.sasl,
@@ -103,9 +122,16 @@ export class Cluster {
                 await broker.connect();
                 return broker;
             } catch (error) {
-                log.warn(`Failed to connect to seed broker ${options.host}:${options.port}`, error);
+                log.debug(`Failed to connect to seed broker ${options.host}:${options.port}`, {
+                    reason: (error as Error).message,
+                });
             }
         }
         throw new KafkaTSError('No seed brokers found');
+    }
+
+    private async refreshBrokerMetadata() {
+        const metadata = await this.sendRequest(API.METADATA, { topics: [] });
+        this.brokerMetadata = Object.fromEntries(metadata.brokers.map((options) => [options.nodeId, options]));
     }
 }

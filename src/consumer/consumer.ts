@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import { API, API_ERROR } from '../api';
+import { API, API_ERROR, handleApiError } from '../api';
 import { FetchResponse, IsolationLevel } from '../api/fetch';
 import { Assignment } from '../api/sync-group';
 import { Cluster } from '../cluster';
@@ -96,15 +96,13 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
 
     @trace()
     public async start(): Promise<void> {
-        const { topics, allowTopicAutoCreation, fromTimestamp } = this.options;
-
         this.stopHook = undefined;
 
         try {
             await this.cluster.connect();
-            await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation });
+            await this.fetchMetadata();
             this.metadata.setAssignment(this.metadata.getTopicPartitions());
-            await this.offsetManager.fetchOffsets({ fromTimestamp });
+            await this.fetchOffsets();
             await this.consumerGroup?.init();
         } catch (error) {
             log.error('Failed to start consumer', error);
@@ -125,8 +123,8 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 await this.fetchManager?.stop();
             });
         }
-        await this.consumerGroup?.leaveGroup().catch((error) => log.debug(`Failed to leave group: ${error.message}`));
-        await this.cluster.disconnect().catch((error) => log.debug(`Failed to disconnect: ${error.message}`));
+        await this.consumerGroup?.leaveGroup().catch((error) => log.debug('Failed to leave group', { reason: (error as Error).message }));
+        await this.cluster.disconnect().catch(() => {});
     }
 
     private async startFetchManager() {
@@ -167,20 +165,22 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             } catch (error) {
                 await this.fetchManager?.stop();
 
-                if ((error as KafkaTSApiError).errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
-                    log.debug('Rebalance in progress...', { apiName: (error as KafkaTSApiError).apiName, groupId });
+                if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
+                    log.debug('Rebalance in progress...', { apiName: error.apiName, groupId });
                     continue;
                 }
-                if ((error as KafkaTSApiError).errorCode === API_ERROR.FENCED_INSTANCE_ID) {
+                if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.FENCED_INSTANCE_ID) {
                     log.debug('New consumer with the same groupInstanceId joined. Exiting the consumer...');
                     this.close();
                     break;
                 }
-                if (
-                    error instanceof ConnectionError ||
-                    (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_COORDINATOR)
-                ) {
-                    log.debug(`${error.message}. Restarting consumer...`);
+                if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_COORDINATOR) {
+                    log.debug('Not coordinator. Searching for new coordinator...');
+                    await this.consumerGroup?.findCoordinator();
+                    return;
+                }
+                if (error instanceof ConnectionError) {
+                    log.debug(`${error.message}. Restarting consumer...`, { stack: error.stack });
                     this.close().then(() => this.start());
                     break;
                 }
@@ -300,12 +300,44 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 rackId,
             });
         } catch (error) {
+            await this.handleError(error);
+            return this.fetch(nodeId, assignment);
+        }
+    }
+
+    private async fetchMetadata(): Promise<void> {
+        const { topics, allowTopicAutoCreation } = this.options;
+        try {
+            await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation });
+        } catch (error) {
+            await this.handleError(error);
+            return this.fetchMetadata();
+        }
+    }
+
+    private async fetchOffsets(): Promise<void> {
+        const { fromTimestamp } = this.options;
+        try {
+            await this.offsetManager.fetchOffsets({ fromTimestamp });
+        } catch (error) {
+            await this.handleError(error);
+            return this.fetchOffsets();
+        }
+    }
+
+    private async handleError(error: unknown) {
+        await handleApiError(error).catch(async (error) => {
+            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_LEADER_OR_FOLLOWER) {
+                log.debug('Refreshing metadata', { reason: error.message });
+                await this.fetchMetadata();
+                return;
+            }
             if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.OFFSET_OUT_OF_RANGE) {
                 log.warn('Offset out of range. Resetting offsets.');
-                await this.offsetManager.fetchOffsets({ fromTimestamp: this.options.fromTimestamp });
-                return this.fetch(nodeId, assignment);
+                await this.fetchOffsets();
+                return;
             }
             throw error;
-        }
+        });
     }
 }

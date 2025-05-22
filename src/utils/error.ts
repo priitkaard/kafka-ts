@@ -21,10 +21,9 @@ export class KafkaTSApiError<T = any> extends KafkaTSError {
     }
 }
 
-export class BrokerNotAvailableError extends KafkaTSError {
-    constructor(public brokerId: number) {
-        super(`Broker ${brokerId} is not available`);
+export class ConnectionError extends KafkaTSError {
+    constructor(message: string, stack?: string) {
+        super(message);
+        this.stack += `\n${stack}`;
     }
 }
-
-export class ConnectionError extends KafkaTSError {}

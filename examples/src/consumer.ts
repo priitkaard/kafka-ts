@@ -4,7 +4,7 @@ import { kafka } from './client';
 (async () => {
     const consumer = await kafka.startConsumer({
         groupId: 'example-group',
-        groupInstanceId: 'example-group-instance',
+        // groupInstanceId: 'example-group-instance',
         topics: ['my-topic'],
         allowTopicAutoCreation: true,
         onBatch: (batch) => {

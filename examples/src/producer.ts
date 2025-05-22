@@ -21,16 +21,20 @@ const producer = kafka.createProducer({ allowTopicAutoCreation: true });
 // rl.once('close', () => producer.close());
 
 const send = async () => {
-    await producer.send(
-    [
-        {
-            topic: 'my-topic',
-            value: 'ping',
-        },
-    ],
-    { acks: -1 },
-    );
-    setTimeout(send, 1000);
+    await producer
+        .send(
+            [
+                {
+                    topic: 'my-topic',
+                    value: 'ping',
+                },
+            ],
+            { acks: -1 },
+        )
+        .catch(console.error)
+        .finally(() => setTimeout(send, 1000));
 };
 
 void send();
+
+process.on('uncaughtException', () => {});

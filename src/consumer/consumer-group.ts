@@ -1,8 +1,9 @@
-import { API, API_ERROR } from '../api';
+import { API, API_ERROR, handleApiError } from '../api';
 import { KEY_TYPE } from '../api/find-coordinator';
 import { Assignment, MemberAssignment } from '../api/sync-group';
 import { Cluster } from '../cluster';
 import { KafkaTSApiError, KafkaTSError } from '../utils/error';
+import { log } from '../utils/logger';
 import { createTracer } from '../utils/tracer';
 import { Consumer } from './consumer';
 import { ConsumerMetadata } from './consumer-metadata';
@@ -36,8 +37,6 @@ export class ConsumerGroup {
     @trace()
     public async init() {
         await this.findCoordinator();
-        await this.options.cluster.setSeedBroker(this.coordinatorId);
-
         this.memberId = '';
     }
 
@@ -75,12 +74,20 @@ export class ConsumerGroup {
         }
     }
 
-    private async findCoordinator() {
-        const { coordinators } = await this.options.cluster.sendRequest(API.FIND_COORDINATOR, {
-            keyType: KEY_TYPE.GROUP,
-            keys: [this.options.groupId],
-        });
-        this.coordinatorId = coordinators[0].nodeId;
+    public async findCoordinator(): Promise<void> {
+        try {
+            const { coordinators } = await this.options.cluster.sendRequest(API.FIND_COORDINATOR, {
+                keyType: KEY_TYPE.GROUP,
+                keys: [this.options.groupId],
+            });
+            this.coordinatorId = coordinators[0].nodeId;
+
+            await this.options.cluster.setSeedBroker(this.coordinatorId);
+            this.heartbeatError = null;
+        } catch (error) {
+            await this.handleError(error);
+            return this.findCoordinator();
+        }
     }
 
     private async joinGroup(): Promise<void> {
@@ -101,15 +108,12 @@ export class ConsumerGroup {
             this.leaderId = response.leader;
             this.memberIds = response.members.map((member) => member.memberId);
         } catch (error) {
-            if ((error as KafkaTSApiError).errorCode === API_ERROR.MEMBER_ID_REQUIRED) {
-                this.memberId = (error as KafkaTSApiError).response.memberId;
-                return this.joinGroup();
-            }
-            throw error;
+            await this.handleError(error);
+            return this.joinGroup();
         }
     }
 
-    private async syncGroup() {
+    private async syncGroup(): Promise<void> {
         const { cluster, metadata, groupId, groupInstanceId } = this.options;
 
         let assignments: MemberAssignment[] = [];
@@ -129,19 +133,24 @@ export class ConsumerGroup {
             assignments = Object.entries(memberAssignments).map(([memberId, assignment]) => ({ memberId, assignment }));
         }
 
-        const response = await cluster.sendRequest(API.SYNC_GROUP, {
-            groupId,
-            groupInstanceId,
-            memberId: this.memberId,
-            generationId: this.generationId,
-            protocolType: 'consumer',
-            protocolName: 'RoundRobinAssigner',
-            assignments,
-        });
-        metadata.setAssignment(response.assignments);
+        try {
+            const response = await cluster.sendRequest(API.SYNC_GROUP, {
+                groupId,
+                groupInstanceId,
+                memberId: this.memberId,
+                generationId: this.generationId,
+                protocolType: 'consumer',
+                protocolName: 'RoundRobinAssigner',
+                assignments,
+            });
+            metadata.setAssignment(response.assignments);
+        } catch (error) {
+            await this.handleError(error);
+            return this.syncGroup();
+        }
     }
 
-    private async offsetFetch() {
+    private async offsetFetch(): Promise<void> {
         const { cluster, groupId, topics, metadata, offsetManager } = this.options;
 
         const assignment = metadata.getAssignment();
@@ -158,24 +167,29 @@ export class ConsumerGroup {
         };
         if (!request.groups.length) return;
 
-        const response = await cluster.sendRequest(API.OFFSET_FETCH, request);
+        try {
+            const response = await cluster.sendRequest(API.OFFSET_FETCH, request);
 
-        const topicPartitions: Record<string, Set<number>> = {};
-        response.groups.forEach((group) => {
-            group.topics.forEach((topic) => {
-                topicPartitions[topic.name] ??= new Set();
-                topic.partitions.forEach(({ partitionIndex, committedOffset }) => {
-                    if (committedOffset >= 0) {
-                        topicPartitions[topic.name].add(partitionIndex);
-                        offsetManager.resolve(topic.name, partitionIndex, committedOffset);
-                    }
+            const topicPartitions: Record<string, Set<number>> = {};
+            response.groups.forEach((group) => {
+                group.topics.forEach((topic) => {
+                    topicPartitions[topic.name] ??= new Set();
+                    topic.partitions.forEach(({ partitionIndex, committedOffset }) => {
+                        if (committedOffset >= 0) {
+                            topicPartitions[topic.name].add(partitionIndex);
+                            offsetManager.resolve(topic.name, partitionIndex, committedOffset);
+                        }
+                    });
                 });
             });
-        });
-        offsetManager.flush(topicPartitions);
+            offsetManager.flush(topicPartitions);
+        } catch (error) {
+            await this.handleError(error);
+            return this.offsetFetch();
+        }
     }
 
-    public async offsetCommit(topicPartitions: Record<string, Set<number>>) {
+    public async offsetCommit(topicPartitions: Record<string, Set<number>>): Promise<void> {
         const { cluster, groupId, groupInstanceId, offsetManager, consumer } = this.options;
         const request = {
             groupId,
@@ -199,7 +213,12 @@ export class ConsumerGroup {
         if (!request.topics.length) {
             return;
         }
-        await cluster.sendRequest(API.OFFSET_COMMIT, request);
+        try {
+            await cluster.sendRequest(API.OFFSET_COMMIT, request);
+        } catch (error) {
+            await this.handleError(error);
+            return this.offsetCommit(topicPartitions);
+        }
         consumer.emit('offsetCommit');
     }
 
@@ -214,7 +233,7 @@ export class ConsumerGroup {
         consumer.emit('heartbeat');
     }
 
-    public async leaveGroup() {
+    public async leaveGroup(): Promise<void> {
         if (this.coordinatorId === -1) {
             return;
         }
@@ -227,10 +246,26 @@ export class ConsumerGroup {
                 members: [{ memberId: this.memberId, groupInstanceId, reason: null }],
             });
         } catch (error) {
-            if ((error as KafkaTSApiError).errorCode === API_ERROR.FENCED_INSTANCE_ID) {
+            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.FENCED_INSTANCE_ID) {
+                return;
+            }
+            await this.handleError(error);
+            return this.leaveGroup();
+        }
+    }
+
+    private async handleError(error: unknown): Promise<void> {
+        await handleApiError(error).catch(async (error) => {
+            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_COORDINATOR) {
+                log.debug('Not coordinator. Searching for new coordinator...');
+                await this.findCoordinator();
+                return;
+            }
+            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.MEMBER_ID_REQUIRED) {
+                this.memberId = error.response.memberId;
                 return;
             }
             throw error;
-        }
+        });
     }
 }
