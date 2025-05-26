@@ -29,6 +29,8 @@ export class Cluster {
     public async connect() {
         this.seedBroker = await this.findSeedBroker();
         this.brokerById = {};
+        
+        await this.refreshBrokerMetadata();
     }
 
     public async disconnect() {
