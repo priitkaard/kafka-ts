@@ -9,6 +9,7 @@ import { delay } from '../utils/delay';
 import { ConnectionError, KafkaTSApiError } from '../utils/error';
 import { log } from '../utils/logger';
 import { defaultRetrier, Retrier } from '../utils/retrier';
+import { withRetry } from '../utils/retry';
 import { createTracer } from '../utils/tracer';
 import { ConsumerGroup } from './consumer-group';
 import { ConsumerMetadata } from './consumer-metadata';
@@ -123,7 +124,9 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 await this.fetchManager?.stop();
             });
         }
-        await this.consumerGroup?.leaveGroup().catch((error) => log.debug('Failed to leave group', { reason: (error as Error).message }));
+        await this.consumerGroup
+            ?.leaveGroup()
+            .catch((error) => log.debug('Failed to leave group', { reason: (error as Error).message }));
         await this.cluster.disconnect().catch(() => {});
     }
 
@@ -177,7 +180,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_COORDINATOR) {
                     log.debug('Not coordinator. Searching for new coordinator...');
                     await this.consumerGroup?.findCoordinator();
-                    return;
+                    continue;
                 }
                 if (error instanceof ConnectionError) {
                     log.debug(`${error.message}. Restarting consumer...`, { stack: error.stack });
@@ -273,12 +276,12 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
     }
 
     private async fetch(nodeId: number, assignment: Assignment): Promise<FetchResponse> {
-        const { rackId, maxWaitMs, minBytes, maxBytes, partitionMaxBytes, isolationLevel } = this.options;
+        return withRetry(this.handleError.bind(this))(async () => {
+            const { rackId, maxWaitMs, minBytes, maxBytes, partitionMaxBytes, isolationLevel } = this.options;
 
-        this.consumerGroup?.handleLastHeartbeat();
+            this.consumerGroup?.handleLastHeartbeat();
 
-        try {
-            return await this.cluster.sendRequestToNode(nodeId)(API.FETCH, {
+            return this.cluster.sendRequestToNode(nodeId)(API.FETCH, {
                 maxWaitMs,
                 minBytes,
                 maxBytes,
@@ -299,30 +302,21 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 forgottenTopicsData: [],
                 rackId,
             });
-        } catch (error) {
-            await this.handleError(error);
-            return this.fetch(nodeId, assignment);
-        }
+        });
     }
 
-    private async fetchMetadata(): Promise<void> {
-        const { topics, allowTopicAutoCreation } = this.options;
-        try {
+    private async fetchMetadata() {
+        return withRetry(this.handleError.bind(this))(async () => {
+            const { topics, allowTopicAutoCreation } = this.options;
             await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation });
-        } catch (error) {
-            await this.handleError(error);
-            return this.fetchMetadata();
-        }
+        });
     }
 
     private async fetchOffsets(): Promise<void> {
-        const { fromTimestamp } = this.options;
-        try {
+        return withRetry(this.handleError.bind(this))(async () => {
+            const { fromTimestamp } = this.options;
             await this.offsetManager.fetchOffsets({ fromTimestamp });
-        } catch (error) {
-            await this.handleError(error);
-            return this.fetchOffsets();
-        }
+        });
     }
 
     private async handleError(error: unknown) {

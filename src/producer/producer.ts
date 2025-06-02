@@ -7,6 +7,7 @@ import { Message } from '../types';
 import { KafkaTSApiError } from '../utils/error';
 import { Lock } from '../utils/lock';
 import { log } from '../utils/logger';
+import { withRetry } from '../utils/retry';
 import { shared } from '../utils/shared';
 import { createTracer } from '../utils/tracer';
 
@@ -143,7 +144,7 @@ export class Producer {
     });
 
     private async initProducerId(): Promise<void> {
-        try {
+        return withRetry(this.handleError.bind(this))(async () => {
             const result = await this.cluster.sendRequest(API.INIT_PRODUCER_ID, {
                 transactionalId: null,
                 transactionTimeoutMs: 0,
@@ -153,10 +154,7 @@ export class Producer {
             this.producerId = result.producerId;
             this.producerEpoch = result.producerEpoch;
             this.sequences = {};
-        } catch (error) {
-            await this.handleError(error);
-            return this.initProducerId();
-        }
+        });
     }
 
     private getSequence(topic: string, partition: number) {
@@ -170,12 +168,9 @@ export class Producer {
     }
 
     private async fetchMetadata(topics: string[], allowTopicAutoCreation: boolean): Promise<void> {
-        try {
+        return withRetry(this.handleError.bind(this))(async () => {
             await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation });
-        } catch (error) {
-            await this.handleError(error);
-            return this.fetchMetadata(topics, allowTopicAutoCreation);
-        }
+        });
     }
 
     private async handleError(error: unknown): Promise<void> {

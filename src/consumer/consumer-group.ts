@@ -4,6 +4,7 @@ import { Assignment, MemberAssignment } from '../api/sync-group';
 import { Cluster } from '../cluster';
 import { KafkaTSApiError, KafkaTSError } from '../utils/error';
 import { log } from '../utils/logger';
+import { withRetry } from '../utils/retry';
 import { createTracer } from '../utils/tracer';
 import { Consumer } from './consumer';
 import { ConsumerMetadata } from './consumer-metadata';
@@ -75,7 +76,7 @@ export class ConsumerGroup {
     }
 
     public async findCoordinator(): Promise<void> {
-        try {
+        return withRetry(this.handleError.bind(this))(async () => {
             const { coordinators } = await this.options.cluster.sendRequest(API.FIND_COORDINATOR, {
                 keyType: KEY_TYPE.GROUP,
                 keys: [this.options.groupId],
@@ -84,15 +85,12 @@ export class ConsumerGroup {
 
             await this.options.cluster.setSeedBroker(this.coordinatorId);
             this.heartbeatError = null;
-        } catch (error) {
-            await this.handleError(error);
-            return this.findCoordinator();
-        }
+        });
     }
 
     private async joinGroup(): Promise<void> {
-        const { cluster, groupId, groupInstanceId, sessionTimeoutMs, rebalanceTimeoutMs, topics } = this.options;
-        try {
+        return withRetry(this.handleError.bind(this))(async () => {
+            const { cluster, groupId, groupInstanceId, sessionTimeoutMs, rebalanceTimeoutMs, topics } = this.options;
             const response = await cluster.sendRequest(API.JOIN_GROUP, {
                 groupId,
                 groupInstanceId,
@@ -107,33 +105,33 @@ export class ConsumerGroup {
             this.generationId = response.generationId;
             this.leaderId = response.leader;
             this.memberIds = response.members.map((member) => member.memberId);
-        } catch (error) {
-            await this.handleError(error);
-            return this.joinGroup();
-        }
+        });
     }
 
     private async syncGroup(): Promise<void> {
-        const { cluster, metadata, groupId, groupInstanceId } = this.options;
+        return withRetry(this.handleError.bind(this))(async () => {
+            const { cluster, metadata, groupId, groupInstanceId } = this.options;
 
-        let assignments: MemberAssignment[] = [];
-        if (this.memberId === this.leaderId) {
-            const memberAssignments = Object.entries(metadata.getTopicPartitions())
-                .flatMap(([topic, partitions]) => partitions.map((partition) => ({ topic, partition })))
-                .reduce(
-                    (acc, { topic, partition }, index) => {
-                        const memberId = this.memberIds[index % this.memberIds.length];
-                        acc[memberId] ??= {};
-                        acc[memberId][topic] ??= [];
-                        acc[memberId][topic].push(partition);
-                        return acc;
-                    },
-                    {} as Record<string, Assignment>,
-                );
-            assignments = Object.entries(memberAssignments).map(([memberId, assignment]) => ({ memberId, assignment }));
-        }
+            let assignments: MemberAssignment[] = [];
+            if (this.memberId === this.leaderId) {
+                const memberAssignments = Object.entries(metadata.getTopicPartitions())
+                    .flatMap(([topic, partitions]) => partitions.map((partition) => ({ topic, partition })))
+                    .reduce(
+                        (acc, { topic, partition }, index) => {
+                            const memberId = this.memberIds[index % this.memberIds.length];
+                            acc[memberId] ??= {};
+                            acc[memberId][topic] ??= [];
+                            acc[memberId][topic].push(partition);
+                            return acc;
+                        },
+                        {} as Record<string, Assignment>,
+                    );
+                assignments = Object.entries(memberAssignments).map(([memberId, assignment]) => ({
+                    memberId,
+                    assignment,
+                }));
+            }
 
-        try {
             const response = await cluster.sendRequest(API.SYNC_GROUP, {
                 groupId,
                 groupInstanceId,
@@ -144,30 +142,27 @@ export class ConsumerGroup {
                 assignments,
             });
             metadata.setAssignment(response.assignments);
-        } catch (error) {
-            await this.handleError(error);
-            return this.syncGroup();
-        }
+        });
     }
 
     private async offsetFetch(): Promise<void> {
-        const { cluster, groupId, topics, metadata, offsetManager } = this.options;
+        return withRetry(this.handleError.bind(this))(async () => {
+            const { cluster, groupId, topics, metadata, offsetManager } = this.options;
 
-        const assignment = metadata.getAssignment();
-        const request = {
-            groups: [
-                {
-                    groupId,
-                    topics: topics
-                        .map((topic) => ({ name: topic, partitionIndexes: assignment[topic] ?? [] }))
-                        .filter(({ partitionIndexes }) => partitionIndexes.length),
-                },
-            ].filter(({ topics }) => topics.length),
-            requireStable: true,
-        };
-        if (!request.groups.length) return;
+            const assignment = metadata.getAssignment();
+            const request = {
+                groups: [
+                    {
+                        groupId,
+                        topics: topics
+                            .map((topic) => ({ name: topic, partitionIndexes: assignment[topic] ?? [] }))
+                            .filter(({ partitionIndexes }) => partitionIndexes.length),
+                    },
+                ].filter(({ topics }) => topics.length),
+                requireStable: true,
+            };
+            if (!request.groups.length) return;
 
-        try {
             const response = await cluster.sendRequest(API.OFFSET_FETCH, request);
 
             const topicPartitions: Record<string, Set<number>> = {};
@@ -183,43 +178,37 @@ export class ConsumerGroup {
                 });
             });
             offsetManager.flush(topicPartitions);
-        } catch (error) {
-            await this.handleError(error);
-            return this.offsetFetch();
-        }
+        });
     }
 
     public async offsetCommit(topicPartitions: Record<string, Set<number>>): Promise<void> {
-        const { cluster, groupId, groupInstanceId, offsetManager, consumer } = this.options;
-        const request = {
-            groupId,
-            groupInstanceId,
-            memberId: this.memberId,
-            generationIdOrMemberEpoch: this.generationId,
-            topics: Object.entries(topicPartitions)
-                .filter(([topic]) => topic in offsetManager.pendingOffsets)
-                .map(([topic, partitions]) => ({
-                    name: topic,
-                    partitions: [...partitions]
-                        .filter((partition) => partition in offsetManager.pendingOffsets[topic])
-                        .map((partitionIndex) => ({
-                            partitionIndex,
-                            committedOffset: offsetManager.pendingOffsets[topic][partitionIndex],
-                            committedLeaderEpoch: -1,
-                            committedMetadata: null,
-                        })),
-                })),
-        };
-        if (!request.topics.length) {
-            return;
-        }
-        try {
+        return withRetry(this.handleError.bind(this))(async () => {
+            const { cluster, groupId, groupInstanceId, offsetManager, consumer } = this.options;
+            const request = {
+                groupId,
+                groupInstanceId,
+                memberId: this.memberId,
+                generationIdOrMemberEpoch: this.generationId,
+                topics: Object.entries(topicPartitions)
+                    .filter(([topic]) => topic in offsetManager.pendingOffsets)
+                    .map(([topic, partitions]) => ({
+                        name: topic,
+                        partitions: [...partitions]
+                            .filter((partition) => partition in offsetManager.pendingOffsets[topic])
+                            .map((partitionIndex) => ({
+                                partitionIndex,
+                                committedOffset: offsetManager.pendingOffsets[topic][partitionIndex],
+                                committedLeaderEpoch: -1,
+                                committedMetadata: null,
+                            })),
+                    })),
+            };
+            if (!request.topics.length) {
+                return;
+            }
             await cluster.sendRequest(API.OFFSET_COMMIT, request);
-        } catch (error) {
-            await this.handleError(error);
-            return this.offsetCommit(topicPartitions);
-        }
-        consumer.emit('offsetCommit');
+            consumer.emit('offsetCommit');
+        });
     }
 
     public async heartbeat() {
@@ -234,24 +223,25 @@ export class ConsumerGroup {
     }
 
     public async leaveGroup(): Promise<void> {
-        if (this.coordinatorId === -1) {
-            return;
-        }
-
-        const { cluster, groupId, groupInstanceId } = this.options;
-        this.stopHeartbeater();
-        try {
-            await cluster.sendRequest(API.LEAVE_GROUP, {
-                groupId,
-                members: [{ memberId: this.memberId, groupInstanceId, reason: null }],
-            });
-        } catch (error) {
-            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.FENCED_INSTANCE_ID) {
+        return withRetry(this.handleError.bind(this))(async () => {
+            if (this.coordinatorId === -1) {
                 return;
             }
-            await this.handleError(error);
-            return this.leaveGroup();
-        }
+
+            const { cluster, groupId, groupInstanceId } = this.options;
+            this.stopHeartbeater();
+            try {
+                await cluster.sendRequest(API.LEAVE_GROUP, {
+                    groupId,
+                    members: [{ memberId: this.memberId, groupInstanceId, reason: null }],
+                });
+            } catch (error) {
+                if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.FENCED_INSTANCE_ID) {
+                    return;
+                }
+                throw error;
+            }
+        });
     }
 
     private async handleError(error: unknown): Promise<void> {
