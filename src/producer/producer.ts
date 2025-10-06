@@ -5,8 +5,8 @@ import { defaultPartitioner, Partition, Partitioner } from '../distributors/part
 import { Metadata } from '../metadata';
 import { Message } from '../types';
 import { KafkaTSApiError } from '../utils/error';
-import { Lock } from '../utils/lock';
 import { log } from '../utils/logger';
+import { PromiseChain } from '../utils/promise-chain';
 import { shared } from '../utils/shared';
 import { createTracer } from '../utils/tracer';
 import { ProducerBuffer } from './producer-buffer';
@@ -25,7 +25,7 @@ export class Producer {
     private metadata: Metadata;
     private state: ProducerState;
     private partition: Partition;
-    private lock = new Lock();
+    private chain = new PromiseChain();
     private bufferByNodeId: Record<number, ProducerBuffer> = {};
 
     constructor(
@@ -88,7 +88,7 @@ export class Producer {
 
     private fetchMetadataForTopics = shared(async (topics: string[]) => {
         const { allowTopicAutoCreation } = this.options;
-        await this.lock.acquire(
+        await this.chain.run(
             topics.map((topic) => `metadata:${topic}`),
             () => this.metadata.fetchMetadataIfNecessary({ topics, allowTopicAutoCreation }),
         );
