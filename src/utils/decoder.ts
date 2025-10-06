@@ -126,13 +126,15 @@ export class Decoder {
 
     public readArray<T>(callback: (opts: Decoder) => T): T[] {
         const length = this.readInt32();
-        const results = Array.from({ length }).map(() => callback(this));
+        const results = new Array<T>(length);
+        for (let i = 0; i < length; i++) results[i] = callback(this);
         return results;
     }
 
     public readCompactArray<T>(callback: (opts: Decoder) => T): T[] {
         const length = this.readUVarInt() - 1;
-        const results = Array.from({ length }).map(() => callback(this));
+        const results = new Array<T>(length);
+        for (let i = 0; i < length; i++) results[i] = callback(this);
         return results;
     }
 
@@ -145,15 +147,16 @@ export class Decoder {
     public readRecords<T>(callback: (opts: Decoder) => T): T[] {
         const length = this.readInt32();
 
-        return Array.from({ length }).map(() => {
+        const results: T[] = [];
+        for (let i = 0; i < length; i++) {
             const size = this.readVarInt();
-            if (!size) {
-                return null as T;
-            }
+            if (!size) continue;
+
             const child = new Decoder(this.buffer.subarray(this.offset, this.offset + size));
             this.offset += size;
-            return callback(child);
-        }).filter(x => x !== null);
+            results.push(callback(child));
+        }
+        return results;
     }
 
     public read(length?: number) {
