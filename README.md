@@ -177,7 +177,7 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 | allowTopicAutoCreation | boolean     | false    | false              | Allow kafka to auto-create topic when it doesn't exist                                  |
 | partitioner            | Partitioner | false    | defaultPartitioner | Custom partitioner function. By default, it uses a default java-compatible partitioner. |
 
-### `producer.send(messages: Message[], options?: { acks?: -1 | 1 })`
+### `producer.send(messages: Message[])`
 
 <!-- export type Message = {
     topic: string;

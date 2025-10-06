@@ -14,7 +14,6 @@ const producer = kafka.createProducer({ allowTopicAutoCreation: true });
 //                 value: line,
 //             },
 //         ],
-//         { acks: -1 },
 //     );
 //     process.stdout.write('> ');
 // });
@@ -29,7 +28,6 @@ const send = async () => {
                     value: 'ping',
                 },
             ],
-            { acks: -1 },
         )
         .catch(console.error)
         .finally(() => setTimeout(send, 1000));

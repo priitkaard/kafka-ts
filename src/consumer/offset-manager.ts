@@ -2,7 +2,8 @@ import { API } from '../api';
 import { IsolationLevel } from '../api/fetch';
 import { Assignment } from '../api/sync-group';
 import { Cluster } from '../cluster';
-import { distributeMessagesToTopicPartitionLeaders } from '../distributors/messages-to-topic-partition-leaders';
+import { groupByLeaderId } from '../distributors/group-by-leader-id';
+import { groupPartitionsByTopic } from '../distributors/group-partitions-by-topic';
 import { createTracer } from '../utils/tracer';
 import { ConsumerMetadata } from './consumer-metadata';
 
@@ -58,22 +59,14 @@ export class OffsetManager {
         const topicPartitions = Object.entries(metadata.getAssignment()).flatMap(([topic, partitions]) =>
             partitions.map((partition) => ({ topic, partition })),
         );
-        const nodeTopicPartitions = distributeMessagesToTopicPartitionLeaders(
-            topicPartitions,
-            metadata.getTopicPartitionLeaderIds(),
-        );
+        const topicPartitionsByLeaderId = groupByLeaderId(topicPartitions, metadata.getTopicPartitionLeaderIds());
 
         await Promise.all(
-            Object.entries(nodeTopicPartitions).map(([nodeId, topicPartitions]) =>
+            Object.entries(topicPartitionsByLeaderId).map(([leaderId, topicPartitions]) =>
                 this.listOffsets({
                     ...options,
-                    nodeId: parseInt(nodeId),
-                    nodeAssignment: Object.fromEntries(
-                        Object.entries(topicPartitions).map(
-                            ([topicName, partitions]) =>
-                                [topicName, Object.keys(partitions).map(Number)] as [string, number[]],
-                        ),
-                    ),
+                    nodeId: parseInt(leaderId),
+                    nodeAssignment: groupPartitionsByTopic(topicPartitions),
                 }),
             ),
         );

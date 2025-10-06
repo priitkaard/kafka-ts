@@ -44,10 +44,10 @@ export class Metadata {
         topics,
         allowTopicAutoCreation,
     }: {
-        topics: string[] | Set<string>;
+        topics: string[];
         allowTopicAutoCreation: boolean;
     }) {
-        const missingTopics = Array.from(topics).filter((topic) => !this.topicPartitions[topic]);
+        const missingTopics = topics.filter((topic) => !this.topicPartitions[topic]);
         if (!missingTopics.length) {
             return;
         }
