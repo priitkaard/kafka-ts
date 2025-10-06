@@ -36,7 +36,7 @@ export class Producer {
             ...options,
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
             partitioner: options.partitioner ?? defaultPartitioner,
-            maxBatchSize: options.maxBatchSize ?? 50,
+            maxBatchSize: options.maxBatchSize ?? 500,
         };
         this.metadata = new Metadata({ cluster });
         this.state = new ProducerState({ cluster });

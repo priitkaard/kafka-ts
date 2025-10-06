@@ -1,9 +1,9 @@
 import { EventEmitter } from 'stream';
 import { kafka } from './client';
 
-const producer = kafka.createProducer({ allowTopicAutoCreation: true, maxBatchSize: 50 });
+const producer = kafka.createProducer({ allowTopicAutoCreation: true, maxBatchSize: 500 });
 
-const CONCURRENCY = parseInt(process.env.CONCURRENCY ?? '2000');
+const CONCURRENCY = parseInt(process.env.CONCURRENCY ?? '5000');
 
 let counter = 0;
 let pendingRequests = 0;
