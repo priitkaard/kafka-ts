@@ -3,7 +3,8 @@ import { API, API_ERROR, handleApiError } from '../api';
 import { FetchResponse, IsolationLevel } from '../api/fetch';
 import { Assignment } from '../api/sync-group';
 import { Cluster } from '../cluster';
-import { distributeMessagesToTopicPartitionLeaders } from '../distributors/messages-to-topic-partition-leaders';
+import { groupByLeaderId } from '../distributors/group-by-leader-id';
+import { groupPartitionsByTopic } from '../distributors/group-partitions-by-topic';
 import { Message } from '../types';
 import { delay } from '../utils/delay';
 import { ConnectionError, KafkaTSApiError } from '../utils/error';
@@ -138,22 +139,20 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 await this.consumerGroup?.join();
 
                 // TODO: If leader is not available, find another read replica
-                const nodeAssignments = Object.entries(
-                    distributeMessagesToTopicPartitionLeaders(
-                        Object.entries(this.metadata.getAssignment()).flatMap(([topic, partitions]) =>
-                            partitions.map((partition) => ({ topic, partition })),
-                        ),
-                        this.metadata.getTopicPartitionLeaderIds(),
-                    ),
-                ).map(([nodeId, assignment]) => ({
-                    nodeId: parseInt(nodeId),
-                    assignment: Object.fromEntries(
-                        Object.entries(assignment).map(([topic, partitions]) => [
-                            topic,
-                            Object.keys(partitions).map(Number),
-                        ]),
-                    ),
-                }));
+
+                const topicPartitions = Object.entries(this.metadata.getAssignment()).flatMap(([topic, partitions]) =>
+                    partitions.map((partition) => ({ topic, partition })),
+                );
+                const topicPartitionsByLeaderId = groupByLeaderId(
+                    topicPartitions,
+                    this.metadata.getTopicPartitionLeaderIds(),
+                );
+                const nodeAssignments = Object.entries(topicPartitionsByLeaderId).map(
+                    ([leaderId, topicPartitions]) => ({
+                        nodeId: parseInt(leaderId),
+                        assignment: groupPartitionsByTopic(topicPartitions),
+                    }),
+                );
 
                 this.fetchManager = new FetchManager({
                     fetch: this.fetch.bind(this),

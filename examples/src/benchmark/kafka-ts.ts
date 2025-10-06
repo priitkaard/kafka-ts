@@ -46,7 +46,6 @@ startBenchmarker({
                 value: 'hello',
                 timestamp: BigInt(timestamp),
             })),
-            { acks },
         );
     },
 });
