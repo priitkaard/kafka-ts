@@ -64,13 +64,12 @@ export class Encoder {
     }
 
     public writeUVarInt(value: number) {
-        const byteArray = [];
-        while ((value & 0xffffff80) !== 0) {
-            byteArray.push((value & 0x7f) | 0x80);
+        this.ensure(5);
+        while (value & 0xffffff80) {
+            this.buffer[this.offset++] = (value & 0x7f) | 0x80;
             value >>>= 7;
         }
-        byteArray.push(value & 0x7f);
-        this.write(Buffer.from(byteArray));
+        this.buffer[this.offset++] = value & 0x7f;
         return this;
     }
     public writeVarInt(value: number) {
@@ -78,13 +77,13 @@ export class Encoder {
     }
 
     public writeUVarLong(value: bigint) {
-        const byteArray = [];
-        while ((value & 0xffffffffffffff80n) !== 0n) {
-            byteArray.push(Number((value & BigInt(0x7f)) | BigInt(0x80)));
+        this.ensure(10);
+        while (value >= 0x80n) {
+            this.buffer[this.offset++] = Number((value & 0x7fn) | 0x80n);
             value >>= 7n;
         }
-        byteArray.push(Number(value & BigInt(0x7f)));
-        return this.write(Buffer.from(byteArray));
+        this.buffer[this.offset++] = Number(value);
+        return this;
     }
     public writeVarLong(value: bigint) {
         return this.writeUVarLong((value << 1n) ^ (value >> 63n));
