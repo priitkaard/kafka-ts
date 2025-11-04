@@ -126,21 +126,22 @@ export class Decoder {
 
     public readArray<T>(callback: (opts: Decoder) => T): T[] {
         const length = this.readInt32();
-        const results = new Array<T>(length);
+        const results = new Array<T>(Math.max(length, 0));
         for (let i = 0; i < length; i++) results[i] = callback(this);
         return results;
     }
 
     public readCompactArray<T>(callback: (opts: Decoder) => T): T[] {
         const length = this.readUVarInt() - 1;
-        const results = new Array<T>(length);
+        const results = new Array<T>(Math.max(length, 0));
         for (let i = 0; i < length; i++) results[i] = callback(this);
         return results;
     }
 
     public readVarIntArray<T>(callback: (opts: Decoder) => T): T[] {
         const length = this.readVarInt();
-        const results = Array.from({ length }).map(() => callback(this));
+        const results = new Array<T>(Math.max(length, 0));
+        for (let i = 0; i < length; i++) results[i] = callback(this);
         return results;
     }
 
