@@ -241,8 +241,10 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             return;
         }
 
-        const resolveOffset = (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) =>
+        const resolveOffset = (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) => {
+            this.consumerGroup?.handleLastHeartbeat();
             this.offsetManager.resolve(message.topic, message.partition, message.offset + 1n);
+        };
 
         try {
             await retrier(() =>
