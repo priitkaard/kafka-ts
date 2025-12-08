@@ -169,6 +169,8 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 | allowTopicAutoCreation | boolean                                | false    | false                           | Allow kafka to auto-create topic when it doesn't exist                               |
 | fromTimestamp          | bigint                                 | false    | -1                              | Start consuming messages from timestamp (-1 = latest offsets, -2 = earliest offsets) |
 | onBatch                | (batch: Message[]) => Promise<unknown> | true     |                                 | Callback executed when a batch of messages is received                               |
+| autoCommitInterval     | number                                 | false    | null                            | Auto-commit offset after a given period in ms                                        |
+| autoCommitThreshold    | number                                 | false    | null                            | Auto-commit offset after a given number of messages is resolved                      |
 
 ### `kafka.createProducer()`
 

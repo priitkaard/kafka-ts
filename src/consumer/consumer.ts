@@ -41,6 +41,8 @@ export type ConsumerOptions = {
             resolveOffset: (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) => void;
         },
     ) => unknown;
+    autoCommitInterval?: number | null;
+    autoCommitThreshold?: number | null;
 };
 
 export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> {
@@ -73,6 +75,8 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             fromBeginning: options.fromBeginning ?? false,
             fromTimestamp: options.fromTimestamp ?? (options.fromBeginning ? -2n : -1n),
             retrier: options.retrier ?? defaultRetrier,
+            autoCommitInterval: options.autoCommitInterval ?? null,
+            autoCommitThreshold: options.autoCommitThreshold ?? null,
         };
 
         this.metadata = new ConsumerMetadata({ cluster: this.cluster });
@@ -241,8 +245,25 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             return;
         }
 
-        const resolveOffset = (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) =>
+        const commit = () =>
+            this.consumerGroup
+                ?.offsetCommit(topicPartitions)
+                .then(() => this.offsetManager.flush(topicPartitions))
+                .catch();
+
+        const autoCommitInterval = options.autoCommitInterval
+            ? setInterval(commit, options.autoCommitInterval)
+            : undefined;
+
+        const resolveOffset = (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) => {
             this.offsetManager.resolve(message.topic, message.partition, message.offset + 1n);
+
+            const currentOffset = this.offsetManager.getCurrentOffset(message.topic, message.partition);
+            const pendingOffset = this.offsetManager.getPendingOffset(message.topic, message.partition);
+            if (options.autoCommitThreshold && pendingOffset - currentOffset >= options.autoCommitThreshold) {
+                commit();
+            }
+        };
 
         try {
             await retrier(() =>
@@ -252,11 +273,10 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
                 ),
             );
         } catch (error) {
-            await this.consumerGroup
-                ?.offsetCommit(topicPartitions)
-                .then(() => this.offsetManager.flush(topicPartitions))
-                .catch();
+            await commit();
             throw error;
+        } finally {
+            clearInterval(autoCommitInterval);
         }
 
         response.responses.forEach(({ topicId, partitions }) => {
