@@ -58,6 +58,9 @@ export class ConsumerGroup {
                 await this.heartbeat();
             } catch (error) {
                 this.heartbeatError = error as KafkaTSError;
+                if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
+                    this.options.consumer.emit('rebalanceInProgress');
+                }
             }
         }, 5000);
     }

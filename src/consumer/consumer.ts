@@ -39,11 +39,12 @@ export type ConsumerOptions = {
         messages: Required<Message>[],
         context: {
             resolveOffset: (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) => void;
+            abortSignal: AbortSignal;
         },
     ) => unknown;
 };
 
-export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> {
+export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; rebalanceInProgress: [] }> {
     private options: Required<ConsumerOptions>;
     private metadata: ConsumerMetadata;
     private consumerGroup: ConsumerGroup | undefined;
@@ -241,39 +242,49 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: [] }> 
             return;
         }
 
-        const resolveOffset = (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) => {
-            this.consumerGroup?.handleLastHeartbeat();
+        const commitOffset = () =>
+            this.consumerGroup?.offsetCommit(topicPartitions).then(() => this.offsetManager.flush(topicPartitions));
+
+        const resolveOffset = (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) =>
             this.offsetManager.resolve(message.topic, message.partition, message.offset + 1n);
+
+        const abortController = new AbortController();
+        const onRebalance = () => {
+            log.warn('Rebalance in progress. Commiting offset and aborting batch processing.');
+            abortController.abort();
+            commitOffset()?.catch();
         };
+        this.on('rebalanceInProgress', onRebalance);
 
         try {
             await retrier(() =>
                 options.onBatch(
                     messages.filter((message) => !this.offsetManager.isResolved(message)),
-                    { resolveOffset },
+                    { resolveOffset, abortSignal: abortController.signal },
                 ),
             );
         } catch (error) {
-            await this.consumerGroup
-                ?.offsetCommit(topicPartitions)
-                .then(() => this.offsetManager.flush(topicPartitions))
-                .catch();
+            await commitOffset()?.catch();
             throw error;
+        } finally {
+            this.off('rebalanceInProgress', onRebalance);
         }
 
-        response.responses.forEach(({ topicId, partitions }) => {
-            partitions.forEach(({ partitionIndex, records }) => {
-                records.forEach(({ baseOffset, lastOffsetDelta }) => {
-                    this.offsetManager.resolve(
-                        this.metadata.getTopicNameById(topicId),
-                        partitionIndex,
-                        baseOffset + BigInt(lastOffsetDelta) + 1n,
-                    );
+        if (!abortController.signal.aborted) {
+            response.responses.forEach(({ topicId, partitions }) => {
+                partitions.forEach(({ partitionIndex, records }) => {
+                    records.forEach(({ baseOffset, lastOffsetDelta }) => {
+                        this.offsetManager.resolve(
+                            this.metadata.getTopicNameById(topicId),
+                            partitionIndex,
+                            baseOffset + BigInt(lastOffsetDelta) + 1n,
+                        );
+                    });
                 });
             });
-        });
-        await this.consumerGroup?.offsetCommit(topicPartitions);
-        this.offsetManager.flush(topicPartitions);
+        }
+
+        await commitOffset();
     }
 
     private async fetch(nodeId: number, assignment: Assignment): Promise<FetchResponse> {
