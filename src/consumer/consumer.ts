@@ -95,6 +95,8 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                   consumer: this,
               })
             : undefined;
+
+        this.setMaxListeners(Infinity);
     }
 
     @trace()
