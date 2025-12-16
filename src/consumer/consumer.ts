@@ -250,11 +250,10 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
 
         const abortController = new AbortController();
         const onRebalance = () => {
-            log.warn('Rebalance in progress. Commiting offset and aborting batch processing.');
             abortController.abort();
             commitOffset()?.catch();
         };
-        this.on('rebalanceInProgress', onRebalance);
+        this.once('rebalanceInProgress', onRebalance);
 
         try {
             await retrier(() =>
