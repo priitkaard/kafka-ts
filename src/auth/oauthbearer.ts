@@ -34,8 +34,7 @@ export const oAuthAuthenticator = ({
 
     const scheduleRefresh = () => {
         tokenPromise.then((token) => {
-            const nowSeconds = Math.floor(Date.now() / 1000);
-            const refreshInSeconds = token.expires_at - nowSeconds - refreshThresholdSeconds;
+            const refreshInMs = (token.expires_in - refreshThresholdSeconds) * 1000;
             setTimeout(() => {
                 tokenPromise = createToken(endpoint, {
                     grant_type: 'refresh_token',
@@ -44,7 +43,7 @@ export const oAuthAuthenticator = ({
                     refresh_token: token.refresh_token,
                 });
                 scheduleRefresh();
-            }, refreshInSeconds * 1000);
+            }, refreshInMs);
         });
     };
     scheduleRefresh();
@@ -60,7 +59,7 @@ type TokenRequest = {
 type TokenResponse = {
     access_token: string;
     refresh_token: string;
-    expires_at: number; // epoch seconds
+    expires_in: number;
 };
 
 const createToken = async (endpoint: string, body: TokenRequest) => {
