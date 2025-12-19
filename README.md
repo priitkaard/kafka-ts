@@ -148,6 +148,7 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 -   PLAIN: `saslPlain({ username, password })`
 -   SCRAM-SHA-256: `saslScramSha256({ username, password })`
 -   SCRAM-SHA-512: `saslScramSha512({ username, password })`
+-   OAUTHBEARER: `oAuthBearer(oAuthAuthenticator({ endpoint, clientId, clientSecret }))`
 
 Custom SASL mechanisms can be implemented following the `SASLProvider` interface. See [src/auth](./src/auth) for examples.
 
