@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import { createKafkaClient, LogLevel, saslScramSha512, setLogLevel } from 'kafka-ts';
+import { createKafkaClient, LogLevel, oAuthAuthenticator, oAuthBearer, saslScramSha512, setLogLevel } from 'kafka-ts';
 
 // setTracer(new OpenTelemetryTracer());
 
@@ -13,5 +13,12 @@ export const kafka = createKafkaClient({
         { host: 'localhost', port: 39094 },
     ],
     sasl: saslScramSha512({ username: 'admin', password: 'admin' }),
+    // sasl: oAuthBearer(
+    //     oAuthAuthenticator({
+    //         endpoint: 'https://oauth.example.com/token',
+    //         clientId: 'my-client-id',
+    //         clientSecret: 'my-client-secret',
+    //     }),
+    // ),
     ssl: { ca: readFileSync('../certs/ca.crt').toString() },
 });
