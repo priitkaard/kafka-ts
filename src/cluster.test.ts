@@ -17,6 +17,7 @@ const kafka = createKafkaClient({
 
 describe.sequential('Low-level API', () => {
     const groupId = randomBytes(16).toString('hex');
+    const topicName = 'kafka-ts-test-topic';
 
     let cluster: Cluster;
 
@@ -29,9 +30,9 @@ describe.sequential('Low-level API', () => {
             allowTopicAutoCreation: false,
             includeTopicAuthorizedOperations: false,
         });
-        if (metadataResult.topics.some((topic) => topic.name === 'kafka-ts-test-topic')) {
+        if (metadataResult.topics.some((topic) => topic.name === topicName)) {
             await cluster.sendRequest(API.DELETE_TOPICS, {
-                topics: [{ name: 'kafka-ts-test-topic', topicId: null }],
+                topics: [{ name: topicName, topicId: null }],
                 timeoutMs: 10000,
             });
         }
@@ -46,13 +47,13 @@ describe.sequential('Low-level API', () => {
         expect(result).toMatchSnapshot();
     });
 
-    let topicId: string = 'd6718d178e1b47c886441ad2d19faea5';
+    let topicId = 'd6718d178e1b47c886441ad2d19faea5';
 
     it('should create topics', async () => {
         const result = await cluster.sendRequest(API.CREATE_TOPICS, {
             topics: [
                 {
-                    name: 'kafka-ts-test-topic',
+                    name: topicName,
                     numPartitions: 10,
                     replicationFactor: 3,
                     assignments: [],
@@ -95,7 +96,7 @@ describe.sequential('Low-level API', () => {
 
     it('should request metadata for a topic', async () => {
         const result = await cluster.sendRequest(API.METADATA, {
-            topics: [{ id: topicId, name: 'kafka-ts-test-topic' }],
+            topics: [{ id: topicId, name: topicName }],
             allowTopicAutoCreation: false,
             includeTopicAuthorizedOperations: false,
         });
@@ -134,7 +135,7 @@ describe.sequential('Low-level API', () => {
             acks: 1,
             topicData: [
                 {
-                    name: 'kafka-ts-test-topic',
+                    name: topicName,
                     partitionData: [
                         {
                             index: partitionIndex,
@@ -181,6 +182,7 @@ describe.sequential('Low-level API', () => {
             topics: [
                 {
                     topicId,
+                    topicName,
                     partitions: [
                         {
                             partition: partitionIndex,
@@ -197,7 +199,7 @@ describe.sequential('Low-level API', () => {
             rackId: '',
         });
         result.responses.forEach((response) => {
-            response.topicId = 'Any<UUID>';
+            if ('topicId' in response) response.topicId = 'Any<UUID>';
             response.partitions.forEach((partition) => {
                 partition.records.forEach((record) => {
                     expect(record.baseTimestamp).toBeGreaterThan(1721926744730n);
@@ -242,7 +244,7 @@ describe.sequential('Low-level API', () => {
                 protocols: [
                     {
                         name: 'RoundRobinAssigner',
-                        metadata: { version: 0, topics: ['kafka-ts-test-topic'] },
+                        metadata: { version: 0, topics: [topicName] },
                     },
                 ],
                 reason: null,
@@ -267,7 +269,7 @@ describe.sequential('Low-level API', () => {
             protocols: [
                 {
                     name: 'RoundRobinAssigner',
-                    metadata: { version: 0, topics: ['kafka-ts-test-topic'] },
+                    metadata: { version: 0, topics: [topicName] },
                 },
             ],
             reason: null,
@@ -306,7 +308,7 @@ describe.sequential('Low-level API', () => {
             groupInstanceId: null,
             topics: [
                 {
-                    name: 'kafka-ts-test-topic',
+                    name: topicName,
                     partitions: [
                         { partitionIndex: 0, committedOffset: 1n, committedLeaderEpoch: 0, committedMetadata: null },
                     ],
@@ -323,7 +325,7 @@ describe.sequential('Low-level API', () => {
                     groupId,
                     topics: [
                         {
-                            name: 'kafka-ts-test-topic',
+                            name: topicName,
                             partitionIndexes: [0],
                         },
                     ],
@@ -360,7 +362,7 @@ describe.sequential('Low-level API', () => {
 
     it('should delete topics', async () => {
         const result = await cluster.sendRequest(API.DELETE_TOPICS, {
-            topics: [{ name: 'kafka-ts-test-topic', topicId: null }],
+            topics: [{ name: topicName, topicId: null }],
             timeoutMs: 10000,
         });
         result.responses.forEach((response) => {

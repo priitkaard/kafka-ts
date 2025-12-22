@@ -219,11 +219,12 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
         this.consumerGroup?.handleLastHeartbeat();
 
         const topicPartitions: Record<string, Set<number>> = {};
-        const messages = response.responses.flatMap(({ topicId, partitions }) => {
-            const topic = this.metadata.getTopicNameById(topicId);
+        const messages = response.responses.flatMap((response) => {
+            const topic =
+                'topicName' in response ? response.topicName : this.metadata.getTopicNameById(response.topicId);
             topicPartitions[topic] ??= new Set();
 
-            return partitions.flatMap(({ partitionIndex, records }) => {
+            return response.partitions.flatMap(({ partitionIndex, records }) => {
                 topicPartitions[topic].add(partitionIndex);
                 return records.flatMap(({ baseTimestamp, baseOffset, records }) =>
                     records.flatMap(
@@ -272,14 +273,14 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
         }
 
         if (!abortController.signal.aborted) {
-            response.responses.forEach(({ topicId, partitions }) => {
-                partitions.forEach(({ partitionIndex, records }) => {
+            response.responses.forEach((response) => {
+                response.partitions.forEach(({ partitionIndex, records }) => {
                     records.forEach(({ baseOffset, lastOffsetDelta }) => {
-                        this.offsetManager.resolve(
-                            this.metadata.getTopicNameById(topicId),
-                            partitionIndex,
-                            baseOffset + BigInt(lastOffsetDelta) + 1n,
-                        );
+                        const topic =
+                            'topicName' in response
+                                ? response.topicName
+                                : this.metadata.getTopicNameById(response.topicId);
+                        this.offsetManager.resolve(topic, partitionIndex, baseOffset + BigInt(lastOffsetDelta) + 1n);
                     });
                 });
             });
@@ -301,12 +302,13 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                 isolationLevel,
                 sessionId: 0,
                 sessionEpoch: -1,
-                topics: Object.entries(assignment).map(([topic, partitions]) => ({
-                    topicId: this.metadata.getTopicIdByName(topic),
+                topics: Object.entries(assignment).map(([topicName, partitions]) => ({
+                    topicId: this.metadata.getTopicIdByName(topicName),
+                    topicName,
                     partitions: partitions.map((partition) => ({
                         partition,
                         currentLeaderEpoch: -1,
-                        fetchOffset: this.offsetManager.getCurrentOffset(topic, partition),
+                        fetchOffset: this.offsetManager.getCurrentOffset(topicName, partition),
                         lastFetchedEpoch: -1,
                         logStartOffset: -1n,
                         partitionMaxBytes,
