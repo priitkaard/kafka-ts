@@ -30,39 +30,46 @@ type SyncGroupResponse = {
 };
 
 /*
-SyncGroup Request (Version: 0) => group_id generation_id member_id [assignments] 
-  group_id => STRING
+SyncGroup Request (Version: 4) => group_id generation_id member_id group_instance_id [assignments] _tagged_fields 
+  group_id => COMPACT_STRING
   generation_id => INT32
-  member_id => STRING
-  assignments => member_id assignment 
-    member_id => STRING
-    assignment => BYTES
+  member_id => COMPACT_STRING
+  group_instance_id => COMPACT_NULLABLE_STRING
+  assignments => member_id assignment _tagged_fields 
+    member_id => COMPACT_STRING
+    assignment => COMPACT_BYTES
 
-SyncGroup Response (Version: 0) => error_code assignment 
+SyncGroup Response (Version: 4) => throttle_time_ms error_code assignment _tagged_fields 
+  throttle_time_ms => INT32
   error_code => INT16
-  assignment => BYTES
+  assignment => COMPACT_BYTES
 */
-const SYNC_GROUP_V0 = createApi<SyncGroupRequest, SyncGroupResponse>({
+const SYNC_GROUP_V4 = createApi<SyncGroupRequest, SyncGroupResponse>({
     apiKey: 14,
-    apiVersion: 0,
-    requestHeaderVersion: 1,
-    responseHeaderVersion: 0,
+    apiVersion: 4,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (encoder, data) =>
         encoder
-            .writeString(data.groupId)
+            .writeCompactString(data.groupId)
             .writeInt32(data.generationId)
-            .writeString(data.memberId)
-            .writeArray(data.assignments, (encoder, assignment) =>
-                encoder.writeString(assignment.memberId).writeBytes(encodeAssignment(assignment.assignment)),
-            ),
+            .writeCompactString(data.memberId)
+            .writeCompactString(data.groupInstanceId)
+            .writeCompactArray(data.assignments, (encoder, assignment) =>
+                encoder
+                    .writeCompactString(assignment.memberId)
+                    .writeCompactBytes(encodeAssignment(assignment.assignment))
+                    .writeTagBuffer(),
+            )
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            throttleTimeMs: 0,
+            throttleTimeMs: decoder.readInt32(),
             errorCode: decoder.readInt16(),
             protocolType: null,
             protocolName: null,
-            assignments: decodeAssignment(decoder.readBytes()!),
-            tags: {},
+            assignments: decodeAssignment(decoder.readCompactBytes()!),
+            tags: decoder.readTagBuffer(),
         };
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
         return result;
@@ -91,7 +98,7 @@ SyncGroup Response (Version: 5) => throttle_time_ms error_code protocol_type pro
 export const SYNC_GROUP = createApi<SyncGroupRequest, SyncGroupResponse>({
     apiKey: 14,
     apiVersion: 5,
-    fallback: SYNC_GROUP_V0,
+    fallback: SYNC_GROUP_V4,
     requestHeaderVersion: 2,
     responseHeaderVersion: 1,
     request: (encoder, data) =>

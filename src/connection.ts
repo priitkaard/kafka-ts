@@ -109,6 +109,8 @@ export class Connection {
                 `Broker does not support API ${getApiName(api)} version ${api.apiVersion} (minVersion=${versionInfo.minVersion}, maxVersion=${versionInfo.maxVersion})`,
             );
         }
+
+        log.debug(`Using API ${getApiName(api)} version ${api.apiVersion}`);
         return api;
     }
 

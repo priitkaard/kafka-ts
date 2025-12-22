@@ -1,9 +1,7 @@
 import { TcpSocketConnectOpts } from 'net';
 import { TLSSocketOptions } from 'tls';
-import { API, getApiName } from './api';
+import { API } from './api';
 import { Connection, SendRequest } from './connection';
-import { Api } from './utils/api';
-import { log } from './utils/logger';
 
 export type SASLProvider = {
     mechanism: string;
@@ -35,7 +33,7 @@ export class Broker {
     public async connect() {
         if (!this.connection.isConnected()) {
             await this.connection.connect();
-            await this.validateApiVersions();
+            await this.fetchApiVersions();
             await this.saslHandshake();
             await this.saslAuthenticate();
         }
@@ -46,24 +44,8 @@ export class Broker {
         await this.connection.disconnect();
     }
 
-    private async validateApiVersions() {
+    private async fetchApiVersions() {
         const { versions } = await this.sendRequest(API.API_VERSIONS, {});
-
-        const apiByKey: Record<number, Api<any, any>> = Object.fromEntries(
-            Object.values(API).map((api) => [api.apiKey, api]),
-        );
-        versions.forEach(({ apiKey, minVersion, maxVersion }) => {
-            const api = apiByKey[apiKey];
-            if (!api) {
-                return;
-            }
-            if (api.apiVersion < minVersion || api.apiVersion > maxVersion) {
-                log.warn(
-                    `Broker does not support API ${getApiName(api)} version ${api.apiVersion} (minVersion=${minVersion}, maxVersion=${maxVersion})`,
-                );
-            }
-        });
-
         const versionsByApiKey = Object.fromEntries(
             versions.map(({ apiKey, minVersion, maxVersion }) => [apiKey, { minVersion, maxVersion }]),
         );
