@@ -1,6 +1,9 @@
 import { API } from '../api';
 import { SASLProvider } from '../broker';
+import { clamp } from '../utils/number';
 import { exponentialBackoff, withRetry } from '../utils/retry';
+
+const MAX_INT = Math.pow(2, 31) - 1;
 
 export const oAuthBearer = (getToken: () => Promise<{ access_token: string }>): SASLProvider => {
     return {
@@ -34,7 +37,7 @@ export const oAuthAuthenticator = ({
 
     const scheduleRefresh = () => {
         tokenPromise.then((token) => {
-            const refreshInMs = (token.expires_in - refreshThresholdSeconds) * 1000;
+            const refreshInMs = clamp((token.expires_in - refreshThresholdSeconds) * 1000, 1, MAX_INT);
             setTimeout(() => {
                 tokenPromise = createToken(endpoint, {
                     grant_type: 'refresh_token',
