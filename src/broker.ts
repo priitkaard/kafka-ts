@@ -49,7 +49,9 @@ export class Broker {
     private async validateApiVersions() {
         const { versions } = await this.sendRequest(API.API_VERSIONS, {});
 
-        const apiByKey: Record<number, Api<any, any>> = Object.fromEntries(Object.values(API).map((api) => [api.apiKey, api]));
+        const apiByKey: Record<number, Api<any, any>> = Object.fromEntries(
+            Object.values(API).map((api) => [api.apiKey, api]),
+        );
         versions.forEach(({ apiKey, minVersion, maxVersion }) => {
             const api = apiByKey[apiKey];
             if (!api) {
@@ -62,7 +64,10 @@ export class Broker {
             }
         });
 
-        this.connection.setVersions(versions);
+        const versionsByApiKey = Object.fromEntries(
+            versions.map(({ apiKey, minVersion, maxVersion }) => [apiKey, { minVersion, maxVersion }]),
+        );
+        this.connection.setVersions(versionsByApiKey);
     }
 
     private async saslHandshake() {

@@ -7,7 +7,7 @@ jobs:
     build:
         runs-on: ubuntu-latest
         permissions:
-          contents: write
+            contents: write
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
               run: npm run build
             - name: Create release
               env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: gh release create ${{ github.ref_name }} --generate-notes
             - name: Publish npm package
               run: npm publish

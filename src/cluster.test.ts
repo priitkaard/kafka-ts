@@ -63,9 +63,9 @@ describe.sequential('Low-level API', () => {
             timeoutMs: 10000,
             validateOnly: false,
         });
-        topicId = result.topics[0].topicId;
+        topicId = result.topics[0]._topicId;
         result.topics.forEach((topic) => {
-            topic.topicId = 'Any<UUID>';
+            topic._topicId = 'Any<UUID>';
         });
         expect(result).toMatchSnapshot();
 
@@ -366,7 +366,7 @@ describe.sequential('Low-level API', () => {
             timeoutMs: 10000,
         });
         result.responses.forEach((response) => {
-            response.topicId = 'Any<UUID>';
+            response._topicId = 'Any<UUID>';
         });
         expect(result).toMatchSnapshot();
     });

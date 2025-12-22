@@ -182,9 +182,9 @@ export class Decoder {
         return this.read(length);
     }
 
-    public readTagBuffer() {
+    public readTagBuffer(): Record<number, Buffer> {
         const numTags = this.readUVarInt();
-        if (!numTags) return;
+        if (!numTags) return {};
 
         const tags: Record<number, Buffer> = {};
         for (let i = 0; i < numTags; i++) {

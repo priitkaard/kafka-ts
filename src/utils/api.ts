@@ -7,7 +7,7 @@ export type Api<Request, Response> = {
     requestHeaderVersion: 1 | 2;
     responseHeaderVersion: 0 | 1;
     fallback?: Api<Request, Response>;
-    request: (encoder: Encoder, body: Request) => Encoder;
+    request: (encoder: Encoder, data: Request) => Encoder;
     response: (buffer: Decoder) => Promise<Response> | Response;
 };
 

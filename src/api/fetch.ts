@@ -85,44 +85,61 @@ export type FetchResponse = {
     })[];
 };
 
-const FETCH_V11 = createApi<FetchRequest, FetchResponse>({
+/*
+Fetch Request (Version: 4) => replica_id max_wait_ms min_bytes max_bytes isolation_level [topics] 
+  replica_id => INT32
+  max_wait_ms => INT32
+  min_bytes => INT32
+  max_bytes => INT32
+  isolation_level => INT8
+  topics => topic [partitions] 
+    topic => STRING
+    partitions => partition fetch_offset partition_max_bytes 
+      partition => INT32
+      fetch_offset => INT64
+      partition_max_bytes => INT32
+
+Fetch Response (Version: 4) => throttle_time_ms [responses] 
+  throttle_time_ms => INT32
+  responses => topic [partitions] 
+    topic => STRING
+    partitions => partition_index error_code high_watermark last_stable_offset [aborted_transactions] records 
+      partition_index => INT32
+      error_code => INT16
+      high_watermark => INT64
+      last_stable_offset => INT64
+      aborted_transactions => producer_id first_offset 
+        producer_id => INT64
+        first_offset => INT64
+      records => RECORDS
+*/
+const FETCH_V4 = createApi<FetchRequest, FetchResponse>({
     apiKey: 1,
-    apiVersion: 11,
+    apiVersion: 4,
     requestHeaderVersion: 1,
     responseHeaderVersion: 0,
     request: (encoder, data) =>
         encoder
-            .writeInt32(-1) // replicaId
+            .writeInt32(-1) // replica_id
             .writeInt32(data.maxWaitMs)
             .writeInt32(data.minBytes)
             .writeInt32(data.maxBytes)
             .writeInt8(data.isolationLevel)
-            .writeInt32(data.sessionId)
-            .writeInt32(data.sessionEpoch)
             .writeArray(data.topics, (encoder, topic) =>
                 encoder
                     .writeString(topic.topicName)
                     .writeArray(topic.partitions, (encoder, partition) =>
                         encoder
                             .writeInt32(partition.partition)
-                            .writeInt32(partition.currentLeaderEpoch)
                             .writeInt64(partition.fetchOffset)
-                            .writeInt32(partition.lastFetchedEpoch)
-                            .writeInt64(partition.logStartOffset)
                             .writeInt32(partition.partitionMaxBytes),
                     ),
-            )
-            .writeArray(data.forgottenTopicsData, (encoder, forgottenTopic) =>
-                encoder
-                    .writeString(forgottenTopic.topicName)
-                    .writeArray(forgottenTopic.partitions, (encoder, partition) => encoder.writeInt32(partition)),
-            )
-            .writeString(data.rackId),
-    response: async (decoder) => {
+            ),
+    response: (decoder) => {
         const result = {
             throttleTimeMs: decoder.readInt32(),
-            errorCode: decoder.readInt16(),
-            sessionId: decoder.readInt32(),
+            errorCode: 0,
+            sessionId: 0,
             responses: decoder.readArray((response) => ({
                 topicName: response.readString()!,
                 partitions: response.readArray((partition) => ({
@@ -130,34 +147,71 @@ const FETCH_V11 = createApi<FetchRequest, FetchResponse>({
                     errorCode: partition.readInt16(),
                     highWatermark: partition.readInt64(),
                     lastStableOffset: partition.readInt64(),
-                    logStartOffset: partition.readInt64(),
+                    logStartOffset: BigInt(0), // Not present in v4 response
                     abortedTransactions: partition.readArray((abortedTransaction) => ({
                         producerId: abortedTransaction.readInt64(),
                         firstOffset: abortedTransaction.readInt64(),
                     })),
-                    preferredReadReplica: partition.readInt32(),
+                    preferredReadReplica: -1, // Not present in v4 response
                     records: decodeRecordBatch(partition, partition.readInt32()),
                 })),
             })),
         };
-
-        if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
         result.responses.forEach((response) => {
             response.partitions.forEach((partition) => {
                 if (partition.errorCode) throw new KafkaTSApiError(partition.errorCode, null, result);
             });
         });
-
         return result;
     },
 });
 
+/*
+Fetch Request (Version: 15) => max_wait_ms min_bytes max_bytes isolation_level session_id session_epoch [topics] [forgotten_topics_data] rack_id _tagged_fields 
+  max_wait_ms => INT32
+  min_bytes => INT32
+  max_bytes => INT32
+  isolation_level => INT8
+  session_id => INT32
+  session_epoch => INT32
+  topics => topic_id [partitions] _tagged_fields 
+    topic_id => UUID
+    partitions => partition current_leader_epoch fetch_offset last_fetched_epoch log_start_offset partition_max_bytes _tagged_fields 
+      partition => INT32
+      current_leader_epoch => INT32
+      fetch_offset => INT64
+      last_fetched_epoch => INT32
+      log_start_offset => INT64
+      partition_max_bytes => INT32
+  forgotten_topics_data => topic_id [partitions] _tagged_fields 
+    topic_id => UUID
+    partitions => INT32
+  rack_id => COMPACT_STRING
+
+Fetch Response (Version: 15) => throttle_time_ms error_code session_id [responses] _tagged_fields 
+  throttle_time_ms => INT32
+  error_code => INT16
+  session_id => INT32
+  responses => topic_id [partitions] _tagged_fields 
+    topic_id => UUID
+    partitions => partition_index error_code high_watermark last_stable_offset log_start_offset [aborted_transactions] preferred_read_replica records _tagged_fields 
+      partition_index => INT32
+      error_code => INT16
+      high_watermark => INT64
+      last_stable_offset => INT64
+      log_start_offset => INT64
+      aborted_transactions => producer_id first_offset _tagged_fields 
+        producer_id => INT64
+        first_offset => INT64
+      preferred_read_replica => INT32
+      records => COMPACT_RECORDS
+*/
 export const FETCH = createApi<FetchRequest, FetchResponse>({
     apiKey: 1,
     apiVersion: 15,
     requestHeaderVersion: 2,
     responseHeaderVersion: 1,
-    fallback: FETCH_V11,
+    fallback: FETCH_V4,
     request: (encoder, data) =>
         encoder
             .writeInt32(data.maxWaitMs)

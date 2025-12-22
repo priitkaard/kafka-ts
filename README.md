@@ -127,9 +127,9 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 
 ### New features compared to kafkajs
 
--   **Static consumer membership** - Rebalancing during rolling deployments causes delays. Using `groupInstanceId` in addition to `groupId` can avoid rebalancing and continue consuming partitions in the existing assignment.
--   **Consuming messages without consumer groups** - When you don't need the consumer to track the partition offsets, you can simply create a consumer without groupId and always either start consuming messages from the beginning or from the latest partition offset.
--   **Low-level API requests** - It's possible to communicate directly with the Kafka cluster using the kafka api protocol.
+- **Static consumer membership** - Rebalancing during rolling deployments causes delays. Using `groupInstanceId` in addition to `groupId` can avoid rebalancing and continue consuming partitions in the existing assignment.
+- **Consuming messages without consumer groups** - When you don't need the consumer to track the partition offsets, you can simply create a consumer without groupId and always either start consuming messages from the beginning or from the latest partition offset.
+- **Low-level API requests** - It's possible to communicate directly with the Kafka cluster using the kafka api protocol.
 
 ## Configuration
 
@@ -145,10 +145,10 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 
 #### Supported SASL mechanisms
 
--   PLAIN: `saslPlain({ username, password })`
--   SCRAM-SHA-256: `saslScramSha256({ username, password })`
--   SCRAM-SHA-512: `saslScramSha512({ username, password })`
--   OAUTHBEARER: `oAuthBearer(oAuthAuthenticator({ endpoint, clientId, clientSecret }))`
+- PLAIN: `saslPlain({ username, password })`
+- SCRAM-SHA-256: `saslScramSha256({ username, password })`
+- SCRAM-SHA-512: `saslScramSha512({ username, password })`
+- OAUTHBEARER: `oAuthBearer(oAuthAuthenticator({ endpoint, clientId, clientSecret }))`
 
 Custom SASL mechanisms can be implemented following the `SASLProvider` interface. See [src/auth](./src/auth) for examples.
 

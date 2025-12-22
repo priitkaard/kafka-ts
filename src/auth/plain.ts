@@ -1,5 +1,5 @@
-import { API } from "../api";
-import { SASLProvider } from "../broker";
+import { API } from '../api';
+import { SASLProvider } from '../broker';
 
 export const saslPlain = ({ username, password }: { username: string; password: string }): SASLProvider => ({
     mechanism: 'PLAIN',

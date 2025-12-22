@@ -102,7 +102,9 @@ export class Connection {
         if (!versionInfo) throw new Error(`Broker does not support API ${getApiName(api)}`);
 
         if (api.apiVersion < versionInfo.minVersion || api.apiVersion > versionInfo.maxVersion) {
-            if (api.fallback) return this.validateVersion(api.fallback);
+            if (api.fallback) {
+                return this.validateVersion(api.fallback);
+            }
             throw new Error(
                 `Broker does not support API ${getApiName(api)} version ${api.apiVersion} (minVersion=${versionInfo.minVersion}, maxVersion=${versionInfo.maxVersion})`,
             );
@@ -110,7 +112,7 @@ export class Connection {
         return api;
     }
 
-    private validateVersionCached = cached(this.validateVersion, (api) => api.apiKey.toString());
+    private validateVersionCached = cached(this.validateVersion.bind(this), (api) => api.apiKey.toString());
 
     @trace((api, body) => ({ message: getApiName(api), body }))
     public async sendRequest<Request, Response>(apiLatest: Api<Request, Response>, body: Request): Promise<Response> {

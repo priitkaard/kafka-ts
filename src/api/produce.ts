@@ -36,7 +36,7 @@ type ProduceRequest = {
 
 type ProduceResponse = {
     responses: {
-        name: string | null;
+        name: string;
         partitionResponses: {
             index: number;
             errorCode: number;
@@ -45,7 +45,7 @@ type ProduceResponse = {
             logStartOffset: bigint;
             recordErrors: {
                 batchIndex: number;
-                batchIndexError: number;
+                batchIndexErrorMessage: string | null;
             }[];
             errorMessage: string | null;
         }[];
@@ -91,12 +91,33 @@ const createBatch = (partition: ProduceRequest['topicData'][0]['partitionData'][
     return batch;
 };
 
-const PRODUCE_V8 = createApi({
+/*
+Produce Request (Version: 3) => transactional_id acks timeout_ms [topic_data] 
+  transactional_id => NULLABLE_STRING
+  acks => INT16
+  timeout_ms => INT32
+  topic_data => name [partition_data] 
+    name => STRING
+    partition_data => index records 
+      index => INT32
+      records => RECORDS
+
+Produce Response (Version: 3) => [responses] throttle_time_ms 
+  responses => name [partition_responses] 
+    name => STRING
+    partition_responses => index error_code base_offset log_append_time_ms 
+      index => INT32
+      error_code => INT16
+      base_offset => INT64
+      log_append_time_ms => INT64
+  throttle_time_ms => INT32
+*/
+const PRODUCE_V3 = createApi<ProduceRequest, ProduceResponse>({
     apiKey: 0,
-    apiVersion: 8,
+    apiVersion: 3,
     requestHeaderVersion: 1,
     responseHeaderVersion: 0,
-    request: (encoder, data: ProduceRequest) =>
+    request: (encoder, data) =>
         encoder
             .writeString(data.transactionalId)
             .writeInt16(data.acks)
@@ -107,24 +128,24 @@ const PRODUCE_V8 = createApi({
                     return encoder.writeInt32(partition.index).writeInt32(batch.getBufferLength()).writeEncoder(batch);
                 }),
             ),
-    response: (decoder): ProduceResponse => {
+    response: (decoder) => {
         const result = {
             responses: decoder.readArray((response) => ({
-                name: response.readString(),
+                name: response.readString()!,
                 partitionResponses: response.readArray((partitionResponse) => ({
                     index: partitionResponse.readInt32(),
                     errorCode: partitionResponse.readInt16(),
                     baseOffset: partitionResponse.readInt64(),
                     logAppendTime: partitionResponse.readInt64(),
-                    logStartOffset: partitionResponse.readInt64(),
-                    recordErrors: partitionResponse.readArray((recordError) => ({
-                        batchIndex: recordError.readInt32(),
-                        batchIndexError: recordError.readInt16(),
-                    })),
-                    errorMessage: partitionResponse.readString(),
+                    logStartOffset: BigInt(0), // Not present in v3 response
+                    recordErrors: [],
+                    errorMessage: null,
+                    tags: {},
                 })),
+                tags: {},
             })),
             throttleTimeMs: decoder.readInt32(),
+            tags: {},
         };
         result.responses.forEach((topic) => {
             topic.partitionResponses.forEach((partition) => {
@@ -137,13 +158,39 @@ const PRODUCE_V8 = createApi({
     },
 });
 
-export const PRODUCE = createApi({
+/*
+Produce Request (Version: 9) => transactional_id acks timeout_ms [topic_data] _tagged_fields 
+  transactional_id => COMPACT_NULLABLE_STRING
+  acks => INT16
+  timeout_ms => INT32
+  topic_data => name [partition_data] _tagged_fields 
+    name => COMPACT_STRING
+    partition_data => index records _tagged_fields 
+      index => INT32
+      records => COMPACT_RECORDS
+
+Produce Response (Version: 9) => [responses] throttle_time_ms _tagged_fields 
+  responses => name [partition_responses] _tagged_fields 
+    name => COMPACT_STRING
+    partition_responses => index error_code base_offset log_append_time_ms log_start_offset [record_errors] error_message _tagged_fields 
+      index => INT32
+      error_code => INT16
+      base_offset => INT64
+      log_append_time_ms => INT64
+      log_start_offset => INT64
+      record_errors => batch_index batch_index_error_message _tagged_fields 
+        batch_index => INT32
+        batch_index_error_message => COMPACT_NULLABLE_STRING
+      error_message => COMPACT_NULLABLE_STRING
+  throttle_time_ms => INT32
+*/
+export const PRODUCE = createApi<ProduceRequest, ProduceResponse>({
     apiKey: 0,
     apiVersion: 9,
     requestHeaderVersion: 2,
     responseHeaderVersion: 1,
-    fallback: PRODUCE_V8,
-    request: (encoder, data: ProduceRequest) =>
+    fallback: PRODUCE_V3,
+    request: (encoder, data) =>
         encoder
             .writeCompactString(data.transactionalId)
             .writeInt16(data.acks)
@@ -162,10 +209,10 @@ export const PRODUCE = createApi({
                     .writeTagBuffer(),
             )
             .writeTagBuffer(),
-    response: (decoder): ProduceResponse => {
+    response: (decoder) => {
         const result = {
             responses: decoder.readCompactArray((response) => ({
-                name: response.readCompactString(),
+                name: response.readCompactString()!,
                 partitionResponses: response.readCompactArray((partitionResponse) => ({
                     index: partitionResponse.readInt32(),
                     errorCode: partitionResponse.readInt16(),
@@ -174,7 +221,7 @@ export const PRODUCE = createApi({
                     logStartOffset: partitionResponse.readInt64(),
                     recordErrors: partitionResponse.readCompactArray((recordError) => ({
                         batchIndex: recordError.readInt32(),
-                        batchIndexError: recordError.readInt16(),
+                        batchIndexErrorMessage: recordError.readCompactString(),
                         tags: recordError.readTagBuffer(),
                     })),
                     errorMessage: partitionResponse.readCompactString(),

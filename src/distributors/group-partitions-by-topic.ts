@@ -1,6 +1,4 @@
-export const groupPartitionsByTopic = <T extends { topic: string; partition: number }>(
-    items: T[]
-) => {
+export const groupPartitionsByTopic = <T extends { topic: string; partition: number }>(items: T[]) => {
     const result: { [topic: string]: number[] } = {};
     items.forEach((item) => {
         result[item.topic] ??= [];

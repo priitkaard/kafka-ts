@@ -21,14 +21,12 @@ const producer = kafka.createProducer({ allowTopicAutoCreation: true });
 
 const send = async () => {
     await producer
-        .send(
-            [
-                {
-                    topic: 'my-topic',
-                    value: 'ping',
-                },
-            ],
-        )
+        .send([
+            {
+                topic: 'my-topic',
+                value: 'ping',
+            },
+        ])
         .catch(console.error)
         .finally(() => setTimeout(send, 1000));
 };
