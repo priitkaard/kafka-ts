@@ -3,6 +3,7 @@ import net, { isIP, Socket, TcpSocketConnectOpts } from 'net';
 import tls, { TLSSocketOptions } from 'tls';
 import { getApiName } from './api';
 import { Api } from './utils/api';
+import { cached } from './utils/cached';
 import { Decoder } from './utils/decoder';
 import { Encoder } from './utils/encoder';
 import { ConnectionError, KafkaTSApiError } from './utils/error';
@@ -20,6 +21,8 @@ type ConnectionOptions = {
 
 type RawResonse = { responseDecoder: Decoder; responseSize: number };
 
+type Versions = { [apiKey: number]: { minVersion: number; maxVersion: number } };
+
 export class Connection {
     private socket = new Socket();
     private queue: {
@@ -31,6 +34,7 @@ export class Connection {
     } = {};
     private lastCorrelationId = 0;
     private chunks: Buffer[] = [];
+    private versions: Versions | undefined;
 
     constructor(private options: ConnectionOptions) {}
 
@@ -86,8 +90,31 @@ export class Connection {
         });
     }
 
+    public setVersions(versions: Versions) {
+        this.versions = versions;
+        this.validateVersionCached.clear();
+    }
+
+    private validateVersion<Request, Response>(api: Api<Request, Response>): Api<Request, Response> {
+        if (!this.versions) return api;
+
+        const versionInfo = this.versions[api.apiKey];
+        if (!versionInfo) throw new Error(`Broker does not support API ${getApiName(api)}`);
+
+        if (api.apiVersion < versionInfo.minVersion || api.apiVersion > versionInfo.maxVersion) {
+            if (api.fallback) return this.validateVersion(api.fallback);
+            throw new Error(
+                `Broker does not support API ${getApiName(api)} version ${api.apiVersion} (minVersion=${versionInfo.minVersion}, maxVersion=${versionInfo.maxVersion})`,
+            );
+        }
+        return api;
+    }
+
+    private validateVersionCached = cached(this.validateVersion, (api) => api.apiKey.toString());
+
     @trace((api, body) => ({ message: getApiName(api), body }))
-    public async sendRequest<Request, Response>(api: Api<Request, Response>, body: Request): Promise<Response> {
+    public async sendRequest<Request, Response>(apiLatest: Api<Request, Response>, body: Request): Promise<Response> {
+        const api = this.validateVersionCached(apiLatest);
         const correlationId = this.nextCorrelationId();
         const apiName = getApiName(api);
 
