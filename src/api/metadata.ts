@@ -6,6 +6,8 @@ export type Metadata = Awaited<ReturnType<(typeof METADATA)['response']>>;
 export const METADATA = createApi({
     apiKey: 3,
     apiVersion: 12,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (
         encoder,
         data: {
@@ -15,23 +17,21 @@ export const METADATA = createApi({
         },
     ) =>
         encoder
-            .writeUVarInt(0)
             .writeCompactArray(data.topics ?? null, (encoder, topic) =>
-                encoder.writeUUID(topic.id).writeCompactString(topic.name).writeUVarInt(0),
+                encoder.writeUUID(topic.id).writeCompactString(topic.name).writeTagBuffer(),
             )
             .writeBoolean(data.allowTopicAutoCreation ?? false)
             .writeBoolean(data.includeTopicAuthorizedOperations ?? false)
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             brokers: decoder.readCompactArray((broker) => ({
                 nodeId: broker.readInt32(),
                 host: broker.readCompactString()!,
                 port: broker.readInt32(),
                 rack: broker.readCompactString(),
-                _tag: broker.readTagBuffer(),
+                tags: broker.readTagBuffer(),
             })),
             clusterId: decoder.readCompactString(),
             controllerId: decoder.readInt32(),
@@ -48,12 +48,12 @@ export const METADATA = createApi({
                     replicaNodes: partition.readCompactArray((node) => node.readInt32()),
                     isrNodes: partition.readCompactArray((node) => node.readInt32()),
                     offlineReplicas: partition.readCompactArray((node) => node.readInt32()),
-                    _tag: partition.readTagBuffer(),
+                    tags: partition.readTagBuffer(),
                 })),
                 topicAuthorizedOperations: topic.readInt32(),
-                _tag: topic.readTagBuffer(),
+                tags: topic.readTagBuffer(),
             })),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         result.topics.forEach((topic) => {
             if (topic.errorCode) throw new KafkaTSApiError(topic.errorCode, null, result);

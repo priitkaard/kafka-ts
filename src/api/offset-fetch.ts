@@ -4,6 +4,8 @@ import { KafkaTSApiError } from '../utils/error';
 export const OFFSET_FETCH = createApi({
     apiKey: 9,
     apiVersion: 8,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (
         encoder,
         data: {
@@ -18,7 +20,6 @@ export const OFFSET_FETCH = createApi({
         },
     ) =>
         encoder
-            .writeUVarInt(0)
             .writeCompactArray(data.groups, (encoder, group) =>
                 encoder
                     .writeCompactString(group.groupId)
@@ -28,15 +29,14 @@ export const OFFSET_FETCH = createApi({
                             .writeCompactArray(topic.partitionIndexes, (encoder, partitionIndex) =>
                                 encoder.writeInt32(partitionIndex),
                             )
-                            .writeUVarInt(0),
+                            .writeTagBuffer(),
                     )
-                    .writeUVarInt(0),
+                    .writeTagBuffer(),
             )
             .writeBoolean(data.requireStable)
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             groups: decoder.readCompactArray((decoder) => ({
                 groupId: decoder.readCompactString(),
@@ -48,14 +48,14 @@ export const OFFSET_FETCH = createApi({
                         committedLeaderEpoch: decoder.readInt32(),
                         committedMetadata: decoder.readCompactString(),
                         errorCode: decoder.readInt16(),
-                        _tag: decoder.readTagBuffer(),
+                        tags: decoder.readTagBuffer(),
                     })),
-                    _tag: decoder.readTagBuffer(),
+                    tags: decoder.readTagBuffer(),
                 })),
                 errorCode: decoder.readInt16(),
-                _tag: decoder.readTagBuffer(),
+                tags: decoder.readTagBuffer(),
             })),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         result.groups.forEach((group) => {
             if (group.errorCode) throw new KafkaTSApiError(group.errorCode, null, result);

@@ -5,6 +5,8 @@ import { IsolationLevel } from './fetch';
 export const LIST_OFFSETS = createApi({
     apiKey: 2,
     apiVersion: 8,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (
         encoder,
         data: {
@@ -21,7 +23,6 @@ export const LIST_OFFSETS = createApi({
         },
     ) =>
         encoder
-            .writeUVarInt(0)
             .writeInt32(data.replicaId)
             .writeInt8(data.isolationLevel)
             .writeCompactArray(data.topics, (encoder, topic) =>
@@ -32,14 +33,13 @@ export const LIST_OFFSETS = createApi({
                             .writeInt32(partition.partitionIndex)
                             .writeInt32(partition.currentLeaderEpoch)
                             .writeInt64(partition.timestamp)
-                            .writeUVarInt(0),
+                            .writeTagBuffer(),
                     )
-                    .writeUVarInt(0),
+                    .writeTagBuffer(),
             )
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             topics: decoder.readCompactArray((decoder) => ({
                 name: decoder.readCompactString()!,
@@ -49,11 +49,11 @@ export const LIST_OFFSETS = createApi({
                     timestamp: decoder.readInt64(),
                     offset: decoder.readInt64(),
                     leaderEpoch: decoder.readInt32(),
-                    _tag: decoder.readTagBuffer(),
+                    tags: decoder.readTagBuffer(),
                 })),
-                _tag: decoder.readTagBuffer(),
+                tags: decoder.readTagBuffer(),
             })),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         result.topics.forEach((topic) => {
             topic.partitions.forEach((partition) => {

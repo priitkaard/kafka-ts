@@ -5,6 +5,8 @@ import { KafkaTSApiError } from '../utils/error';
 export const JOIN_GROUP = createApi({
     apiKey: 11,
     apiVersion: 9,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (
         encoder,
         data: {
@@ -25,7 +27,6 @@ export const JOIN_GROUP = createApi({
         },
     ) =>
         encoder
-            .writeUVarInt(0)
             .writeCompactString(data.groupId)
             .writeInt32(data.sessionTimeoutMs)
             .writeInt32(data.rebalanceTimeoutMs)
@@ -38,13 +39,12 @@ export const JOIN_GROUP = createApi({
                     .writeArray(protocol.metadata.topics, (encoder, topic) => encoder.writeString(topic))
                     .writeBytes(Buffer.alloc(0))
                     .value();
-                return encoder.writeCompactString(protocol.name).writeCompactBytes(metadata).writeUVarInt(0);
+                return encoder.writeCompactString(protocol.name).writeCompactBytes(metadata).writeTagBuffer();
             })
             .writeCompactString(data.reason)
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             errorCode: decoder.readInt16(),
             generationId: decoder.readInt32(),
@@ -57,9 +57,9 @@ export const JOIN_GROUP = createApi({
                 memberId: decoder.readCompactString()!,
                 groupInstanceId: decoder.readCompactString(),
                 metadata: decoder.readCompactBytes()!,
-                _tag: decoder.readTagBuffer(),
+                tags: decoder.readTagBuffer(),
             })),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
         return result;

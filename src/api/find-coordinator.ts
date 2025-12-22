@@ -9,15 +9,15 @@ export const KEY_TYPE = {
 export const FIND_COORDINATOR = createApi({
     apiKey: 10,
     apiVersion: 4,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (encoder, data: { keyType: number; keys: string[] }) =>
         encoder
-            .writeUVarInt(0)
             .writeInt8(data.keyType)
             .writeCompactArray(data.keys, (encoder, key) => encoder.writeCompactString(key))
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             coordinators: decoder.readCompactArray((decoder) => ({
                 key: decoder.readCompactString(),
@@ -26,9 +26,9 @@ export const FIND_COORDINATOR = createApi({
                 port: decoder.readInt32(),
                 errorCode: decoder.readInt16(),
                 errorMessage: decoder.readCompactString(),
-                _tag: decoder.readTagBuffer(),
+                tags: decoder.readTagBuffer(),
             })),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         result.coordinators.forEach((coordinator) => {
             if (coordinator.errorCode)

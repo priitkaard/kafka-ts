@@ -13,6 +13,8 @@ export type MemberAssignment = {
 export const SYNC_GROUP = createApi({
     apiKey: 14,
     apiVersion: 5,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (
         encoder,
         data: {
@@ -26,7 +28,6 @@ export const SYNC_GROUP = createApi({
         },
     ) =>
         encoder
-            .writeUVarInt(0)
             .writeCompactString(data.groupId)
             .writeInt32(data.generationId)
             .writeCompactString(data.memberId)
@@ -37,18 +38,17 @@ export const SYNC_GROUP = createApi({
                 encoder
                     .writeCompactString(assignment.memberId)
                     .writeCompactBytes(encodeAssignment(assignment.assignment))
-                    .writeUVarInt(0),
+                    .writeTagBuffer(),
             )
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             errorCode: decoder.readInt16(),
             protocolType: decoder.readCompactString(),
             protocolName: decoder.readCompactString(),
             assignments: decodeAssignment(decoder.readCompactBytes()!),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
         return result;

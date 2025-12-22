@@ -4,6 +4,8 @@ import { KafkaTSApiError } from '../utils/error';
 export const CREATE_TOPICS = createApi({
     apiKey: 19,
     apiVersion: 7,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (
         encoder,
         data: {
@@ -25,7 +27,6 @@ export const CREATE_TOPICS = createApi({
         },
     ) =>
         encoder
-            .writeUVarInt(0)
             .writeCompactArray(data.topics, (encoder, topic) =>
                 encoder
                     .writeCompactString(topic.name)
@@ -37,19 +38,18 @@ export const CREATE_TOPICS = createApi({
                             .writeCompactArray(assignment.brokerIds, (encoder, brokerId) =>
                                 encoder.writeInt32(brokerId),
                             )
-                            .writeUVarInt(0),
+                            .writeTagBuffer(),
                     )
                     .writeCompactArray(topic.configs ?? [], (encoder, config) =>
-                        encoder.writeCompactString(config.name).writeCompactString(config.value).writeUVarInt(0),
+                        encoder.writeCompactString(config.name).writeCompactString(config.value).writeTagBuffer(),
                     )
-                    .writeUVarInt(0),
+                    .writeTagBuffer(),
             )
             .writeInt32(data.timeoutMs ?? 10_000)
             .writeBoolean(data.validateOnly ?? false)
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             topics: decoder.readCompactArray((topic) => ({
                 name: topic.readCompactString(),
@@ -64,11 +64,11 @@ export const CREATE_TOPICS = createApi({
                     readOnly: config.readBoolean(),
                     configSource: config.readInt8(),
                     isSensitive: config.readBoolean(),
-                    _tag: config.readTagBuffer(),
+                    tags: config.readTagBuffer(),
                 })),
-                _tag: topic.readTagBuffer(),
+                tags: topic.readTagBuffer(),
             })),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         result.topics.forEach((topic) => {
             if (topic.errorCode) throw new KafkaTSApiError(topic.errorCode, topic.errorMessage, result);

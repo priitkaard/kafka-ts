@@ -4,6 +4,8 @@ import { KafkaTSApiError } from '../utils/error';
 export const HEARTBEAT = createApi({
     apiKey: 12,
     apiVersion: 4,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (
         encoder,
         data: {
@@ -14,18 +16,16 @@ export const HEARTBEAT = createApi({
         },
     ) =>
         encoder
-            .writeUVarInt(0)
             .writeCompactString(data.groupId)
             .writeInt32(data.generationId)
             .writeCompactString(data.memberId)
             .writeCompactString(data.groupInstanceId)
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             errorCode: decoder.readInt16(),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
         return result;

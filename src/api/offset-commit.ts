@@ -4,6 +4,8 @@ import { KafkaTSApiError } from '../utils/error';
 export const OFFSET_COMMIT = createApi({
     apiKey: 8,
     apiVersion: 8,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (
         encoder,
         data: {
@@ -23,7 +25,6 @@ export const OFFSET_COMMIT = createApi({
         },
     ) =>
         encoder
-            .writeUVarInt(0)
             .writeCompactString(data.groupId)
             .writeInt32(data.generationIdOrMemberEpoch)
             .writeCompactString(data.memberId)
@@ -37,25 +38,24 @@ export const OFFSET_COMMIT = createApi({
                             .writeInt64(partition.committedOffset)
                             .writeInt32(partition.committedLeaderEpoch)
                             .writeCompactString(partition.committedMetadata)
-                            .writeUVarInt(0),
+                            .writeTagBuffer(),
                     )
-                    .writeUVarInt(0),
+                    .writeTagBuffer(),
             )
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             topics: decoder.readCompactArray((decoder) => ({
                 name: decoder.readCompactString(),
                 partitions: decoder.readCompactArray((decoder) => ({
                     partitionIndex: decoder.readInt32(),
                     errorCode: decoder.readInt16(),
-                    _tag: decoder.readTagBuffer(),
+                    tags: decoder.readTagBuffer(),
                 })),
-                _tag: decoder.readTagBuffer(),
+                tags: decoder.readTagBuffer(),
             })),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         result.topics.forEach((topic) => {
             topic.partitions.forEach((partition) => {

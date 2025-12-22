@@ -23,7 +23,11 @@ type RawResonse = { responseDecoder: Decoder; responseSize: number };
 export class Connection {
     private socket = new Socket();
     private queue: {
-        [correlationId: number]: { resolve: (response: RawResonse) => void; reject: (error: Error) => void };
+        [correlationId: number]: {
+            api: Api<any, any>;
+            resolve: (response: RawResonse) => void;
+            reject: (error: Error) => void;
+        };
     } = {};
     private lastCorrelationId = 0;
     private chunks: Buffer[] = [];
@@ -92,6 +96,7 @@ export class Connection {
             .writeInt16(api.apiVersion)
             .writeInt32(correlationId)
             .writeString(this.options.clientId);
+        if (api.requestHeaderVersion === 2) encoder.writeTagBuffer();
 
         const request = api.request(encoder, body);
         const requestEncoder = new Encoder().writeInt32(request.getBufferLength()).writeEncoder(request);
@@ -106,7 +111,7 @@ export class Connection {
             }, this.options.requestTimeout);
 
             try {
-                this.queue[correlationId] = { resolve, reject };
+                this.queue[correlationId] = { api, resolve, reject };
                 await this.write(requestEncoder.value());
             } catch (error) {
                 reject(new ConnectionError((error as Error).message, stack));
@@ -151,6 +156,8 @@ export class Connection {
         const correlationId = responseDecoder.readInt32();
 
         const context = this.queue[correlationId];
+        if (context?.api.responseHeaderVersion === 1) responseDecoder.readTagBuffer();
+
         if (context) {
             delete this.queue[correlationId];
             context.resolve({ responseDecoder, responseSize });

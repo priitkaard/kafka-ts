@@ -1,47 +1,165 @@
 import { createApi } from '../utils/api';
 import { Decoder } from '../utils/decoder';
 import { KafkaTSApiError, KafkaTSError } from '../utils/error';
-import { log } from '../utils/logger';
 
 export const enum IsolationLevel {
     READ_UNCOMMITTED = 0,
     READ_COMMITTED = 1,
 }
 
-export type FetchResponse = Awaited<ReturnType<(typeof FETCH)['response']>>;
+type FetchRequest = {
+    maxWaitMs: number;
+    minBytes: number;
+    maxBytes: number;
+    isolationLevel: IsolationLevel;
+    sessionId: number;
+    sessionEpoch: number;
+    topics: {
+        topicId: string;
+        topicName: string;
+        partitions: {
+            partition: number;
+            currentLeaderEpoch: number;
+            fetchOffset: bigint;
+            lastFetchedEpoch: number;
+            logStartOffset: bigint;
+            partitionMaxBytes: number;
+        }[];
+    }[];
+    forgottenTopicsData: {
+        topicId: string;
+        topicName: string;
+        partitions: number[];
+    }[];
+    rackId: string;
+};
 
-export const FETCH = createApi({
-    apiKey: 1,
-    apiVersion: 15,
-    request: (
-        encoder,
-        data: {
-            maxWaitMs: number;
-            minBytes: number;
-            maxBytes: number;
-            isolationLevel: IsolationLevel;
-            sessionId: number;
-            sessionEpoch: number;
-            topics: {
-                topicId: string;
-                partitions: {
-                    partition: number;
-                    currentLeaderEpoch: number;
-                    fetchOffset: bigint;
-                    lastFetchedEpoch: number;
-                    logStartOffset: bigint;
-                    partitionMaxBytes: number;
+export type FetchResponse = {
+    throttleTimeMs: number;
+    errorCode: number;
+    sessionId: number;
+    responses: (({ topicId: string } | { topicName: string }) & {
+        partitions: {
+            partitionIndex: number;
+            errorCode: number;
+            highWatermark: bigint;
+            lastStableOffset: bigint;
+            logStartOffset: bigint;
+            abortedTransactions: {
+                producerId: bigint;
+                firstOffset: bigint;
+            }[];
+            preferredReadReplica: number;
+            records: {
+                baseOffset: bigint;
+                batchLength: number;
+                partitionLeaderEpoch: number;
+                magic: number;
+                crc: number;
+                attributes: number;
+                compression: number;
+                timestampType: 'CreateTime' | 'LogAppendTime';
+                isTransactional: boolean;
+                isControlBatch: boolean;
+                hasDeleteHorizonMs: boolean;
+                deleteHorizonMs: bigint | null;
+                lastOffsetDelta: number;
+                baseTimestamp: bigint;
+                maxTimestamp: bigint;
+                producerId: bigint;
+                producerEpoch: number;
+                baseSequence: number;
+                records: {
+                    attributes: number;
+                    timestampDelta: bigint;
+                    offsetDelta: number;
+                    key: string | null;
+                    value: string | null;
+                    headers: {
+                        key: string;
+                        value: string;
+                    }[];
                 }[];
             }[];
-            forgottenTopicsData: {
-                topicId: string;
-                partitions: number[];
-            }[];
-            rackId: string;
-        },
-    ) =>
+        }[];
+    })[];
+};
+
+const FETCH_V11 = createApi<FetchRequest, FetchResponse>({
+    apiKey: 1,
+    apiVersion: 11,
+    requestHeaderVersion: 1,
+    responseHeaderVersion: 0,
+    request: (encoder, data) =>
         encoder
-            .writeUVarInt(0)
+            .writeInt32(-1) // replicaId
+            .writeInt32(data.maxWaitMs)
+            .writeInt32(data.minBytes)
+            .writeInt32(data.maxBytes)
+            .writeInt8(data.isolationLevel)
+            .writeInt32(data.sessionId)
+            .writeInt32(data.sessionEpoch)
+            .writeArray(data.topics, (encoder, topic) =>
+                encoder
+                    .writeString(topic.topicName)
+                    .writeArray(topic.partitions, (encoder, partition) =>
+                        encoder
+                            .writeInt32(partition.partition)
+                            .writeInt32(partition.currentLeaderEpoch)
+                            .writeInt64(partition.fetchOffset)
+                            .writeInt32(partition.lastFetchedEpoch)
+                            .writeInt64(partition.logStartOffset)
+                            .writeInt32(partition.partitionMaxBytes),
+                    ),
+            )
+            .writeArray(data.forgottenTopicsData, (encoder, forgottenTopic) =>
+                encoder
+                    .writeString(forgottenTopic.topicName)
+                    .writeArray(forgottenTopic.partitions, (encoder, partition) => encoder.writeInt32(partition)),
+            )
+            .writeString(data.rackId),
+    response: async (decoder) => {
+        const result = {
+            throttleTimeMs: decoder.readInt32(),
+            errorCode: decoder.readInt16(),
+            sessionId: decoder.readInt32(),
+            responses: decoder.readArray((response) => ({
+                topicName: response.readString()!,
+                partitions: response.readArray((partition) => ({
+                    partitionIndex: partition.readInt32(),
+                    errorCode: partition.readInt16(),
+                    highWatermark: partition.readInt64(),
+                    lastStableOffset: partition.readInt64(),
+                    logStartOffset: partition.readInt64(),
+                    abortedTransactions: partition.readArray((abortedTransaction) => ({
+                        producerId: abortedTransaction.readInt64(),
+                        firstOffset: abortedTransaction.readInt64(),
+                    })),
+                    preferredReadReplica: partition.readInt32(),
+                    records: decodeRecordBatch(partition, partition.readInt32()),
+                })),
+            })),
+        };
+
+        if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
+        result.responses.forEach((response) => {
+            response.partitions.forEach((partition) => {
+                if (partition.errorCode) throw new KafkaTSApiError(partition.errorCode, null, result);
+            });
+        });
+
+        return result;
+    },
+});
+
+export const FETCH = createApi<FetchRequest, FetchResponse>({
+    apiKey: 1,
+    apiVersion: 15,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
+    fallback: FETCH_V11,
+    request: (encoder, data) =>
+        encoder
             .writeInt32(data.maxWaitMs)
             .writeInt32(data.minBytes)
             .writeInt32(data.maxBytes)
@@ -59,21 +177,20 @@ export const FETCH = createApi({
                             .writeInt32(partition.lastFetchedEpoch)
                             .writeInt64(partition.logStartOffset)
                             .writeInt32(partition.partitionMaxBytes)
-                            .writeUVarInt(0),
+                            .writeTagBuffer(),
                     )
-                    .writeUVarInt(0),
+                    .writeTagBuffer(),
             )
             .writeCompactArray(data.forgottenTopicsData, (encoder, forgottenTopic) =>
                 encoder
                     .writeUUID(forgottenTopic.topicId)
                     .writeCompactArray(forgottenTopic.partitions, (encoder, partition) => encoder.writeInt32(partition))
-                    .writeUVarInt(0),
+                    .writeTagBuffer(),
             )
             .writeCompactString(data.rackId)
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: async (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             errorCode: decoder.readInt16(),
             sessionId: decoder.readInt32(),
@@ -88,15 +205,15 @@ export const FETCH = createApi({
                     abortedTransactions: partition.readCompactArray((abortedTransaction) => ({
                         producerId: abortedTransaction.readInt64(),
                         firstOffset: abortedTransaction.readInt64(),
-                        _tag: abortedTransaction.readTagBuffer(),
+                        tags: abortedTransaction.readTagBuffer(),
                     })),
                     preferredReadReplica: partition.readInt32(),
-                    records: decodeRecordBatch(partition),
-                    _tag: partition.readTagBuffer(),
+                    records: decodeRecordBatch(partition, partition.readUVarInt() - 1),
+                    tags: partition.readTagBuffer(),
                 })),
-                _tag: response.readTagBuffer(),
+                tags: response.readTagBuffer(),
             })),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
 
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
@@ -110,8 +227,7 @@ export const FETCH = createApi({
     },
 });
 
-const decodeRecordBatch = (decoder: Decoder) => {
-    const size = decoder.readUVarInt() - 1;
+const decodeRecordBatch = (decoder: Decoder, size: number) => {
     if (size <= 0) {
         return [];
     }
@@ -143,7 +259,7 @@ const decodeRecordBatch = (decoder: Decoder) => {
         const attributes = batchDecoder.readInt16();
 
         const compression = attributes & 0x07;
-        const timestampType = (attributes & 0x08) >> 3 ? 'LogAppendTime' : 'CreateTime';
+        const timestampType = (attributes & 0x08) >> 3 ? ('LogAppendTime' as const) : ('CreateTime' as const);
         const isTransactional = !!((attributes & 0x10) >> 4);
         const isControlBatch = !!((attributes & 0x20) >> 5);
         const hasDeleteHorizonMs = !!((attributes & 0x40) >> 6);
@@ -155,6 +271,7 @@ const decodeRecordBatch = (decoder: Decoder) => {
         const lastOffsetDelta = batchDecoder.readInt32();
         const baseTimestamp = batchDecoder.readInt64();
         const maxTimestamp = batchDecoder.readInt64();
+        const deleteHorizonMs = hasDeleteHorizonMs ? baseTimestamp : null;
         const producerId = batchDecoder.readInt64();
         const producerEpoch = batchDecoder.readInt16();
         const baseSequence = batchDecoder.readInt32();
@@ -172,6 +289,7 @@ const decodeRecordBatch = (decoder: Decoder) => {
             isTransactional,
             isControlBatch,
             hasDeleteHorizonMs,
+            deleteHorizonMs,
             lastOffsetDelta,
             baseTimestamp,
             maxTimestamp,

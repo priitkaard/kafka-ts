@@ -2,45 +2,149 @@ import { createApi } from '../utils/api.js';
 import { Encoder } from '../utils/encoder.js';
 import { KafkaTSApiError } from '../utils/error.js';
 
+type ProduceRequest = {
+    transactionalId: string | null;
+    acks: number;
+    timeoutMs: number;
+    topicData: {
+        name: string;
+        partitionData: {
+            index: number;
+            baseOffset: bigint;
+            partitionLeaderEpoch: number;
+            attributes: number;
+            lastOffsetDelta: number;
+            baseTimestamp: bigint;
+            maxTimestamp: bigint;
+            producerId: bigint;
+            producerEpoch: number;
+            baseSequence: number;
+            records: {
+                attributes: number;
+                timestampDelta: bigint;
+                offsetDelta: number;
+                key: string | null;
+                value: string | null;
+                headers: {
+                    key: string;
+                    value: string;
+                }[];
+            }[];
+        }[];
+    }[];
+};
+
+type ProduceResponse = {
+    responses: {
+        name: string | null;
+        partitionResponses: {
+            index: number;
+            errorCode: number;
+            baseOffset: bigint;
+            logAppendTime: bigint;
+            logStartOffset: bigint;
+            recordErrors: {
+                batchIndex: number;
+                batchIndexError: number;
+            }[];
+            errorMessage: string | null;
+        }[];
+    }[];
+    throttleTimeMs: number;
+};
+
+const createBatch = (partition: ProduceRequest['topicData'][0]['partitionData'][0]) => {
+    const batchBody = new Encoder()
+        .writeInt16(partition.attributes)
+        .writeInt32(partition.lastOffsetDelta)
+        .writeInt64(partition.baseTimestamp)
+        .writeInt64(partition.maxTimestamp)
+        .writeInt64(partition.producerId)
+        .writeInt16(partition.producerEpoch)
+        .writeInt32(partition.baseSequence)
+        .writeArray(partition.records, (encoder, record) => {
+            const recordBody = new Encoder()
+                .writeInt8(record.attributes)
+                .writeVarLong(record.timestampDelta)
+                .writeVarInt(record.offsetDelta)
+                .writeVarIntString(record.key)
+                .writeVarIntString(record.value)
+                .writeVarIntArray(record.headers, (encoder, header) =>
+                    encoder.writeVarIntString(header.key).writeVarIntString(header.value),
+                );
+
+            return encoder.writeVarInt(recordBody.getBufferLength()).writeEncoder(recordBody);
+        })
+        .value();
+
+    const batchHeader = new Encoder()
+        .writeInt32(partition.partitionLeaderEpoch)
+        .writeInt8(2) // magic byte
+        .writeUInt32(unsigned(crc32C(batchBody)))
+        .write(batchBody);
+
+    const batch = new Encoder()
+        .writeInt64(partition.baseOffset)
+        .writeInt32(batchHeader.getBufferLength())
+        .writeEncoder(batchHeader);
+
+    return batch;
+};
+
+const PRODUCE_V8 = createApi({
+    apiKey: 0,
+    apiVersion: 8,
+    requestHeaderVersion: 1,
+    responseHeaderVersion: 0,
+    request: (encoder, data: ProduceRequest) =>
+        encoder
+            .writeString(data.transactionalId)
+            .writeInt16(data.acks)
+            .writeInt32(data.timeoutMs)
+            .writeArray(data.topicData, (encoder, topic) =>
+                encoder.writeString(topic.name).writeArray(topic.partitionData, (encoder, partition) => {
+                    const batch = createBatch(partition);
+                    return encoder.writeInt32(partition.index).writeInt32(batch.getBufferLength()).writeEncoder(batch);
+                }),
+            ),
+    response: (decoder): ProduceResponse => {
+        const result = {
+            responses: decoder.readArray((response) => ({
+                name: response.readString(),
+                partitionResponses: response.readArray((partitionResponse) => ({
+                    index: partitionResponse.readInt32(),
+                    errorCode: partitionResponse.readInt16(),
+                    baseOffset: partitionResponse.readInt64(),
+                    logAppendTime: partitionResponse.readInt64(),
+                    logStartOffset: partitionResponse.readInt64(),
+                    recordErrors: partitionResponse.readArray((recordError) => ({
+                        batchIndex: recordError.readInt32(),
+                        batchIndexError: recordError.readInt16(),
+                    })),
+                    errorMessage: partitionResponse.readString(),
+                })),
+            })),
+            throttleTimeMs: decoder.readInt32(),
+        };
+        result.responses.forEach((topic) => {
+            topic.partitionResponses.forEach((partition) => {
+                if (partition.errorCode !== 0) {
+                    throw new KafkaTSApiError(partition.errorCode, partition.errorMessage, result);
+                }
+            });
+        });
+        return result;
+    },
+});
+
 export const PRODUCE = createApi({
     apiKey: 0,
     apiVersion: 9,
-    request: (
-        encoder,
-        data: {
-            transactionalId: string | null;
-            acks: number;
-            timeoutMs: number;
-            topicData: {
-                name: string;
-                partitionData: {
-                    index: number;
-                    baseOffset: bigint;
-                    partitionLeaderEpoch: number;
-                    attributes: number;
-                    lastOffsetDelta: number;
-                    baseTimestamp: bigint;
-                    maxTimestamp: bigint;
-                    producerId: bigint;
-                    producerEpoch: number;
-                    baseSequence: number;
-                    records: {
-                        attributes: number;
-                        timestampDelta: bigint;
-                        offsetDelta: number;
-                        key: string | null;
-                        value: string | null;
-                        headers: {
-                            key: string;
-                            value: string;
-                        }[];
-                    }[];
-                }[];
-            }[];
-        },
-    ) =>
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
+    fallback: PRODUCE_V8,
+    request: (encoder, data: ProduceRequest) =>
         encoder
-            .writeUVarInt(0)
             .writeCompactString(data.transactionalId)
             .writeInt16(data.acks)
             .writeInt32(data.timeoutMs)
@@ -48,52 +152,18 @@ export const PRODUCE = createApi({
                 encoder
                     .writeCompactString(topic.name)
                     .writeCompactArray(topic.partitionData, (encoder, partition) => {
-                        const batchBody = new Encoder()
-                            .writeInt16(partition.attributes)
-                            .writeInt32(partition.lastOffsetDelta)
-                            .writeInt64(partition.baseTimestamp)
-                            .writeInt64(partition.maxTimestamp)
-                            .writeInt64(partition.producerId)
-                            .writeInt16(partition.producerEpoch)
-                            .writeInt32(partition.baseSequence)
-                            .writeArray(partition.records, (encoder, record) => {
-                                const recordBody = new Encoder()
-                                    .writeInt8(record.attributes)
-                                    .writeVarLong(record.timestampDelta)
-                                    .writeVarInt(record.offsetDelta)
-                                    .writeVarIntString(record.key)
-                                    .writeVarIntString(record.value)
-                                    .writeVarIntArray(record.headers, (encoder, header) =>
-                                        encoder.writeVarIntString(header.key).writeVarIntString(header.value),
-                                    );
-
-                                return encoder.writeVarInt(recordBody.getBufferLength()).writeEncoder(recordBody);
-                            })
-                            .value();
-
-                        const batchHeader = new Encoder()
-                            .writeInt32(partition.partitionLeaderEpoch)
-                            .writeInt8(2) // magic byte
-                            .writeUInt32(unsigned(crc32C(batchBody)))
-                            .write(batchBody);
-
-                        const batch = new Encoder()
-                            .writeInt64(partition.baseOffset)
-                            .writeInt32(batchHeader.getBufferLength())
-                            .writeEncoder(batchHeader);
-
+                        const batch = createBatch(partition);
                         return encoder
                             .writeInt32(partition.index)
                             .writeUVarInt(batch.getBufferLength() + 1)
                             .writeEncoder(batch)
-                            .writeUVarInt(0);
+                            .writeTagBuffer();
                     })
-                    .writeUVarInt(0),
+                    .writeTagBuffer(),
             )
-            .writeUVarInt(0),
-    response: (decoder) => {
+            .writeTagBuffer(),
+    response: (decoder): ProduceResponse => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             responses: decoder.readCompactArray((response) => ({
                 name: response.readCompactString(),
                 partitionResponses: response.readCompactArray((partitionResponse) => ({
@@ -105,15 +175,15 @@ export const PRODUCE = createApi({
                     recordErrors: partitionResponse.readCompactArray((recordError) => ({
                         batchIndex: recordError.readInt32(),
                         batchIndexError: recordError.readInt16(),
-                        _tag: recordError.readTagBuffer(),
+                        tags: recordError.readTagBuffer(),
                     })),
                     errorMessage: partitionResponse.readCompactString(),
-                    _tag: partitionResponse.readTagBuffer(),
+                    tags: partitionResponse.readTagBuffer(),
                 })),
-                _tag: response.readTagBuffer(),
+                tags: response.readTagBuffer(),
             })),
             throttleTimeMs: decoder.readInt32(),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         result.responses.forEach((topic) => {
             topic.partitionResponses.forEach((partition) => {

@@ -4,6 +4,8 @@ import { KafkaTSApiError } from '../utils/error';
 export const SASL_HANDSHAKE = createApi({
     apiKey: 17,
     apiVersion: 1,
+    requestHeaderVersion: 1,
+    responseHeaderVersion: 0,
     request: (encoder, data: { mechanism: string }) => encoder.writeString(data.mechanism),
     response: (decoder) => {
         const result = {
