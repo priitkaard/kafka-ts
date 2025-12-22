@@ -23,28 +23,52 @@ type LeaveGroupResponse = {
 };
 
 /*
-LeaveGroup Request (Version: 0) => group_id member_id 
-  group_id => STRING
-  member_id => STRING
+LeaveGroup Request (Version: 4) => group_id [members] _tagged_fields 
+  group_id => COMPACT_STRING
+  members => member_id group_instance_id _tagged_fields 
+    member_id => COMPACT_STRING
+    group_instance_id => COMPACT_NULLABLE_STRING
 
-LeaveGroup Response (Version: 0) => error_code 
+LeaveGroup Response (Version: 4) => throttle_time_ms error_code [members] _tagged_fields 
+  throttle_time_ms => INT32
   error_code => INT16
+  members => member_id group_instance_id error_code _tagged_fields 
+    member_id => COMPACT_STRING
+    group_instance_id => COMPACT_NULLABLE_STRING
+    error_code => INT16
 */
 
-const LEAVE_GROUP_V0 = createApi<LeaveGroupRequest, LeaveGroupResponse>({
+const LEAVE_GROUP_V4 = createApi<LeaveGroupRequest, LeaveGroupResponse>({
     apiKey: 13,
-    apiVersion: 0,
-    requestHeaderVersion: 1,
-    responseHeaderVersion: 0,
-    request: (encoder, body) => encoder.writeString(body.groupId).writeString(body.members[0].memberId),
+    apiVersion: 4,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
+    request: (encoder, body) =>
+        encoder
+            .writeCompactString(body.groupId)
+            .writeCompactArray(body.members, (encoder, member) =>
+                encoder
+                    .writeCompactString(member.memberId)
+                    .writeCompactString(member.groupInstanceId)
+                    .writeTagBuffer(),
+            )
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            throttleTimeMs: 0,
+            throttleTimeMs: decoder.readInt32(),
             errorCode: decoder.readInt16(),
-            members: [],
-            tags: {},
+            members: decoder.readCompactArray((decoder) => ({
+                memberId: decoder.readCompactString()!,
+                groupInstanceId: decoder.readCompactString(),
+                errorCode: decoder.readInt16(),
+                tags: decoder.readTagBuffer(),
+            })),
+            tags: decoder.readTagBuffer(),
         };
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
+        result.members.forEach((member) => {
+            if (member.errorCode) throw new KafkaTSApiError(member.errorCode, null, result);
+        });
         return result;
     },
 });
@@ -68,7 +92,7 @@ LeaveGroup Response (Version: 5) => throttle_time_ms error_code [members] _tagge
 export const LEAVE_GROUP = createApi<LeaveGroupRequest, LeaveGroupResponse>({
     apiKey: 13,
     apiVersion: 5,
-    fallback: LEAVE_GROUP_V0,
+    fallback: LEAVE_GROUP_V4,
     requestHeaderVersion: 2,
     responseHeaderVersion: 1,
     request: (encoder, body) =>

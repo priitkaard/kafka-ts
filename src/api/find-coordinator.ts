@@ -26,43 +26,46 @@ type FindCoordinatorResponse = {
 };
 
 /*
-FindCoordinator Request (Version: 1) => key key_type 
-  key => STRING
+FindCoordinator Request (Version: 3) => key key_type _tagged_fields 
+  key => COMPACT_STRING
   key_type => INT8
 
-FindCoordinator Response (Version: 1) => throttle_time_ms error_code error_message node_id host port 
+FindCoordinator Response (Version: 3) => throttle_time_ms error_code error_message node_id host port _tagged_fields 
   throttle_time_ms => INT32
   error_code => INT16
-  error_message => NULLABLE_STRING
+  error_message => COMPACT_NULLABLE_STRING
   node_id => INT32
-  host => STRING
+  host => COMPACT_STRING
   port => INT32
 */
-const FIND_COORDINATOR_V1 = createApi<FindCoordinatorRequest, FindCoordinatorResponse>({
+const FIND_COORDINATOR_V3 = createApi<FindCoordinatorRequest, FindCoordinatorResponse>({
     apiKey: 10,
-    apiVersion: 1,
-    requestHeaderVersion: 1,
-    responseHeaderVersion: 0,
-    request: (encoder, data) => encoder.writeString(data.keys[0]).writeInt8(data.keyType),
+    apiVersion: 3,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
+    request: (encoder, data) =>
+        encoder
+            .writeCompactString(data.keys[0])
+            .writeInt8(data.keyType)
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
             throttleTimeMs: decoder.readInt32(),
-            errorCode: decoder.readInt16(),
-            errorMessage: decoder.readString(),
             coordinators: [
                 {
-                    key: '', // Key not present in v1 response
+                    key: '',
+                    errorCode: decoder.readInt16(),
+                    errorMessage: decoder.readCompactString(),
                     nodeId: decoder.readInt32(),
-                    host: decoder.readString()!,
+                    host: decoder.readCompactString()!,
                     port: decoder.readInt32(),
-                    errorCode: 0,
-                    errorMessage: null,
                     tags: {},
                 },
             ],
-            tags: {},
+            tags: decoder.readTagBuffer(),
         };
-        if (result.errorCode) throw new KafkaTSApiError(result.errorCode, result.errorMessage, result);
+        if (result.coordinators[0].errorCode)
+            throw new KafkaTSApiError(result.coordinators[0].errorCode, result.coordinators[0].errorMessage, result);
         return result;
     },
 });
@@ -85,7 +88,7 @@ FindCoordinator Response (Version: 4) => throttle_time_ms [coordinators] _tagged
 export const FIND_COORDINATOR = createApi<FindCoordinatorRequest, FindCoordinatorResponse>({
     apiKey: 10,
     apiVersion: 4,
-    fallback: FIND_COORDINATOR_V1,
+    fallback: FIND_COORDINATOR_V3,
     requestHeaderVersion: 2,
     responseHeaderVersion: 1,
     request: (encoder, data) =>

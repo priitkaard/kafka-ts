@@ -38,61 +38,68 @@ type JoinGroupResponse = {
 };
 
 /*
-JoinGroup Request (Version: 0) => group_id session_timeout_ms member_id protocol_type [protocols] 
-  group_id => STRING
+JoinGroup Request (Version: 6) => group_id session_timeout_ms rebalance_timeout_ms member_id group_instance_id protocol_type [protocols] _tagged_fields 
+  group_id => COMPACT_STRING
   session_timeout_ms => INT32
-  member_id => STRING
-  protocol_type => STRING
-  protocols => name metadata 
-    name => STRING
-    metadata => BYTES
+  rebalance_timeout_ms => INT32
+  member_id => COMPACT_STRING
+  group_instance_id => COMPACT_NULLABLE_STRING
+  protocol_type => COMPACT_STRING
+  protocols => name metadata _tagged_fields 
+    name => COMPACT_STRING
+    metadata => COMPACT_BYTES
 
-JoinGroup Response (Version: 0) => error_code generation_id protocol_name leader member_id [members] 
+JoinGroup Response (Version: 6) => throttle_time_ms error_code generation_id protocol_name leader member_id [members] _tagged_fields 
+  throttle_time_ms => INT32
   error_code => INT16
   generation_id => INT32
-  protocol_name => STRING
-  leader => STRING
-  member_id => STRING
-  members => member_id metadata 
-    member_id => STRING
-    metadata => BYTES
+  protocol_name => COMPACT_STRING
+  leader => COMPACT_STRING
+  member_id => COMPACT_STRING
+  members => member_id group_instance_id metadata _tagged_fields 
+    member_id => COMPACT_STRING
+    group_instance_id => COMPACT_NULLABLE_STRING
+    metadata => COMPACT_BYTES
 */
-const JOIN_GROUP_V0 = createApi<JoinGroupRequest, JoinGroupResponse>({
+const JOIN_GROUP_V6 = createApi<JoinGroupRequest, JoinGroupResponse>({
     apiKey: 11,
-    apiVersion: 0,
-    requestHeaderVersion: 1,
-    responseHeaderVersion: 0,
+    apiVersion: 6,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
     request: (encoder, data) =>
         encoder
-            .writeString(data.groupId)
+            .writeCompactString(data.groupId)
             .writeInt32(data.sessionTimeoutMs)
-            .writeString(data.memberId)
-            .writeString(data.protocolType)
-            .writeArray(data.protocols, (encoder, protocol) => {
+            .writeInt32(data.rebalanceTimeoutMs)
+            .writeCompactString(data.memberId)
+            .writeCompactString(data.groupInstanceId)
+            .writeCompactString(data.protocolType)
+            .writeCompactArray(data.protocols, (encoder, protocol) => {
                 const metadata = new Encoder()
                     .writeInt16(protocol.metadata.version)
                     .writeArray(protocol.metadata.topics, (encoder, topic) => encoder.writeString(topic))
                     .writeBytes(Buffer.alloc(0))
                     .value();
-                return encoder.writeString(protocol.name).writeBytes(metadata);
-            }),
+                return encoder.writeCompactString(protocol.name).writeCompactBytes(metadata).writeTagBuffer();
+            })
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            throttleTimeMs: 0,
+            throttleTimeMs: decoder.readInt32(),
             errorCode: decoder.readInt16(),
             generationId: decoder.readInt32(),
             protocolType: null,
-            protocolName: decoder.readString(),
-            leader: decoder.readString()!,
+            protocolName: decoder.readCompactString()!,
+            leader: decoder.readCompactString()!,
             skipAssignment: false,
-            memberId: decoder.readString()!,
-            members: decoder.readArray((decoder) => ({
-                memberId: decoder.readString()!,
-                groupInstanceId: null,
-                metadata: decoder.readBytes()!,
-                tags: {},
+            memberId: decoder.readCompactString()!,
+            members: decoder.readCompactArray((decoder) => ({
+                memberId: decoder.readCompactString()!,
+                groupInstanceId: decoder.readCompactString(),
+                metadata: decoder.readCompactBytes()!,
+                tags: decoder.readTagBuffer(),
             })),
-            tags: {},
+            tags: decoder.readTagBuffer(),
         };
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
         return result;
@@ -129,7 +136,7 @@ JoinGroup Response (Version: 9) => throttle_time_ms error_code generation_id pro
 export const JOIN_GROUP = createApi<JoinGroupRequest, JoinGroupResponse>({
     apiKey: 11,
     apiVersion: 9,
-    fallback: JOIN_GROUP_V0,
+    fallback: JOIN_GROUP_V6,
     requestHeaderVersion: 2,
     responseHeaderVersion: 1,
     request: (encoder, data) =>
