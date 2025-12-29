@@ -1,24 +1,144 @@
 import { createApi } from '../utils/api';
 import { KafkaTSApiError } from '../utils/error';
 
-export const OFFSET_FETCH = createApi({
+type OffsetFetchRequest = {
+    groups: {
+        groupId: string;
+        topics: {
+            name: string;
+            partitionIndexes: number[];
+        }[];
+    }[];
+    requireStable: boolean;
+};
+
+type OffsetFetchResponse = {
+    throttleTimeMs: number;
+    groups: {
+        groupId: string;
+        topics: {
+            name: string;
+            partitions: {
+                partitionIndex: number;
+                committedOffset: bigint;
+                committedLeaderEpoch: number;
+                committedMetadata: string | null;
+                errorCode: number;
+                tags: Record<number, Buffer>;
+            }[];
+            tags: Record<number, Buffer>;
+        }[];
+        errorCode: number;
+        tags: Record<number, Buffer>;
+    }[];
+    tags: Record<number, Buffer>;
+};
+
+/*
+OffsetFetch Request (Version: 6) => group_id [topics] _tagged_fields 
+  group_id => COMPACT_STRING
+  topics => name [partition_indexes] _tagged_fields 
+    name => COMPACT_STRING
+    partition_indexes => INT32
+
+OffsetFetch Response (Version: 6) => throttle_time_ms [topics] error_code _tagged_fields 
+  throttle_time_ms => INT32
+  topics => name [partitions] _tagged_fields 
+    name => COMPACT_STRING
+    partitions => partition_index committed_offset committed_leader_epoch metadata error_code _tagged_fields 
+      partition_index => INT32
+      committed_offset => INT64
+      committed_leader_epoch => INT32
+      metadata => COMPACT_NULLABLE_STRING
+      error_code => INT16
+  error_code => INT16
+*/
+const OFFSET_FETCH_V6 = createApi<OffsetFetchRequest, OffsetFetchResponse>({
+    apiKey: 9,
+    apiVersion: 6,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
+    request: (encoder, data) => {
+        if (data.groups.length !== 1) throw new Error('OffsetFetch v6 requires exactly 1 group');
+        const [group] = data.groups;
+        return encoder
+            .writeCompactString(group.groupId)
+            .writeCompactArray(group.topics, (encoder, topic) =>
+                encoder
+                    .writeCompactString(topic.name)
+                    .writeCompactArray(topic.partitionIndexes, (encoder, partitionIndex) =>
+                        encoder.writeInt32(partitionIndex),
+                    )
+                    .writeTagBuffer(),
+            )
+            .writeTagBuffer();
+    },
+    response: (decoder) => {
+        const result = {
+            throttleTimeMs: decoder.readInt32(),
+            groups: [
+                {
+                    groupId: '',
+                    topics: decoder.readCompactArray((decoder) => ({
+                        name: decoder.readCompactString()!,
+                        partitions: decoder.readCompactArray((decoder) => ({
+                            partitionIndex: decoder.readInt32(),
+                            committedOffset: decoder.readInt64(),
+                            committedLeaderEpoch: decoder.readInt32(),
+                            committedMetadata: decoder.readCompactString(),
+                            errorCode: decoder.readInt16(),
+                            tags: decoder.readTagBuffer(),
+                        })),
+                        tags: decoder.readTagBuffer(),
+                    })),
+                    errorCode: decoder.readInt16(),
+                    tags: {},
+                },
+            ],
+            tags: decoder.readTagBuffer(),
+        };
+        if (result.groups[0].errorCode)
+            throw new KafkaTSApiError(result.groups[0].errorCode, null, result);
+        result.groups[0].topics.forEach((topic) => {
+            topic.partitions.forEach((partition) => {
+                if (partition.errorCode) throw new KafkaTSApiError(partition.errorCode, null, result);
+            });
+        });
+        return result;
+    },
+});
+
+/*
+OffsetFetch Request (Version: 8) => [groups] require_stable _tagged_fields 
+  groups => group_id [topics] _tagged_fields 
+    group_id => COMPACT_STRING
+    topics => name [partition_indexes] _tagged_fields 
+      name => COMPACT_STRING
+      partition_indexes => INT32
+  require_stable => BOOLEAN
+
+OffsetFetch Response (Version: 8) => throttle_time_ms [groups] _tagged_fields 
+  throttle_time_ms => INT32
+  groups => group_id [topics] error_code _tagged_fields 
+    group_id => COMPACT_STRING
+    topics => name [partitions] _tagged_fields 
+      name => COMPACT_STRING
+      partitions => partition_index committed_offset committed_leader_epoch metadata error_code _tagged_fields 
+        partition_index => INT32
+        committed_offset => INT64
+        committed_leader_epoch => INT32
+        metadata => COMPACT_NULLABLE_STRING
+        error_code => INT16
+    error_code => INT16
+*/
+export const OFFSET_FETCH = createApi<OffsetFetchRequest, OffsetFetchResponse>({
     apiKey: 9,
     apiVersion: 8,
-    request: (
-        encoder,
-        data: {
-            groups: {
-                groupId: string;
-                topics: {
-                    name: string;
-                    partitionIndexes: number[];
-                }[];
-            }[];
-            requireStable: boolean;
-        },
-    ) =>
+    fallback: OFFSET_FETCH_V6,
+    requestHeaderVersion: 2,
+    responseHeaderVersion: 1,
+    request: (encoder, data) =>
         encoder
-            .writeUVarInt(0)
             .writeCompactArray(data.groups, (encoder, group) =>
                 encoder
                     .writeCompactString(group.groupId)
@@ -28,18 +148,17 @@ export const OFFSET_FETCH = createApi({
                             .writeCompactArray(topic.partitionIndexes, (encoder, partitionIndex) =>
                                 encoder.writeInt32(partitionIndex),
                             )
-                            .writeUVarInt(0),
+                            .writeTagBuffer(),
                     )
-                    .writeUVarInt(0),
+                    .writeTagBuffer(),
             )
             .writeBoolean(data.requireStable)
-            .writeUVarInt(0),
+            .writeTagBuffer(),
     response: (decoder) => {
         const result = {
-            _tag: decoder.readTagBuffer(),
             throttleTimeMs: decoder.readInt32(),
             groups: decoder.readCompactArray((decoder) => ({
-                groupId: decoder.readCompactString(),
+                groupId: decoder.readCompactString()!,
                 topics: decoder.readCompactArray((decoder) => ({
                     name: decoder.readCompactString()!,
                     partitions: decoder.readCompactArray((decoder) => ({
@@ -48,14 +167,14 @@ export const OFFSET_FETCH = createApi({
                         committedLeaderEpoch: decoder.readInt32(),
                         committedMetadata: decoder.readCompactString(),
                         errorCode: decoder.readInt16(),
-                        _tag: decoder.readTagBuffer(),
+                        tags: decoder.readTagBuffer(),
                     })),
-                    _tag: decoder.readTagBuffer(),
+                    tags: decoder.readTagBuffer(),
                 })),
                 errorCode: decoder.readInt16(),
-                _tag: decoder.readTagBuffer(),
+                tags: decoder.readTagBuffer(),
             })),
-            _tag2: decoder.readTagBuffer(),
+            tags: decoder.readTagBuffer(),
         };
         result.groups.forEach((group) => {
             if (group.errorCode) throw new KafkaTSApiError(group.errorCode, null, result);

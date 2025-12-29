@@ -2,7 +2,6 @@ import { TcpSocketConnectOpts } from 'net';
 import { TLSSocketOptions } from 'tls';
 import { API } from './api';
 import { Connection, SendRequest } from './connection';
-import { KafkaTSError } from './utils/error';
 
 export type SASLProvider = {
     mechanism: string;
@@ -34,7 +33,7 @@ export class Broker {
     public async connect() {
         if (!this.connection.isConnected()) {
             await this.connection.connect();
-            await this.validateApiVersions();
+            await this.fetchApiVersions();
             await this.saslHandshake();
             await this.saslAuthenticate();
         }
@@ -45,21 +44,12 @@ export class Broker {
         await this.connection.disconnect();
     }
 
-    private async validateApiVersions() {
+    private async fetchApiVersions() {
         const { versions } = await this.sendRequest(API.API_VERSIONS, {});
-
-        const apiByKey = Object.fromEntries(Object.values(API).map((api) => [api.apiKey, api]));
-        versions.forEach(({ apiKey, minVersion, maxVersion }) => {
-            if (!apiByKey[apiKey]) {
-                return;
-            }
-            const { apiVersion } = apiByKey[apiKey];
-            if (apiVersion < minVersion || apiVersion > maxVersion) {
-                throw new KafkaTSError(
-                    `API ${apiKey} version ${apiVersion} is not supported by the broker (minVersion=${minVersion}, maxVersion=${maxVersion})`,
-                );
-            }
-        });
+        const versionsByApiKey = Object.fromEntries(
+            versions.map(({ apiKey, minVersion, maxVersion }) => [apiKey, { minVersion, maxVersion }]),
+        );
+        this.connection.setVersions(versionsByApiKey);
     }
 
     private async saslHandshake() {

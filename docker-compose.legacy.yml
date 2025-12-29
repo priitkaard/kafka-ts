@@ -1,0 +1,105 @@
+# Kafka 2.4.0 with ZooKeeper (KRaft not available in 2.4.0)
+services:
+    zookeeper:
+        image: confluentinc/cp-zookeeper:5.4.0
+        container_name: zookeeper
+        platform: linux/amd64
+        ports:
+            - '2181:2181'
+        environment:
+            ZOOKEEPER_CLIENT_PORT: 2181
+            ZOOKEEPER_TICK_TIME: 2000
+
+    kafka-0:
+        container_name: kafka-0
+        image: confluentinc/cp-kafka:5.4.0
+        platform: linux/amd64
+        depends_on:
+            - zookeeper
+        ports:
+            - '39092:39092'
+        environment:
+            KAFKA_BROKER_ID: 0
+            KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+            KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,EXTERNAL:SASL_SSL'
+            KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-0:19092,EXTERNAL://localhost:39092'
+            KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+            KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN'
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+            KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+            KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+            KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+            KAFKA_SSL_KEYSTORE_LOCATION: '/etc/kafka/secrets/kafka.keystore.jks'
+            KAFKA_SSL_KEYSTORE_PASSWORD: 'password'
+            KAFKA_SSL_KEY_PASSWORD: 'password'
+            KAFKA_SSL_TRUSTSTORE_LOCATION: '/etc/kafka/secrets/kafka.truststore.jks'
+            KAFKA_SSL_TRUSTSTORE_PASSWORD: 'password'
+            KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ''
+            KAFKA_SSL_CLIENT_AUTH: 'required'
+            KAFKA_LISTENER_NAME_EXTERNAL_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin" user_admin="admin";'
+        volumes:
+            - ./certs/kafka.truststore.jks:/etc/kafka/secrets/kafka.truststore.jks
+            - ./certs/kafka.keystore.jks:/etc/kafka/secrets/kafka.keystore.jks
+
+    kafka-1:
+        container_name: kafka-1
+        image: confluentinc/cp-kafka:5.4.0
+        platform: linux/amd64
+        depends_on:
+            - zookeeper
+        ports:
+            - '39093:39093'
+        environment:
+            KAFKA_BROKER_ID: 1
+            KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+            KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,EXTERNAL:SASL_SSL'
+            KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-1:19093,EXTERNAL://localhost:39093'
+            KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+            KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN'
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+            KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+            KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+            KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+            KAFKA_SSL_KEYSTORE_LOCATION: '/etc/kafka/secrets/kafka.keystore.jks'
+            KAFKA_SSL_KEYSTORE_PASSWORD: 'password'
+            KAFKA_SSL_KEY_PASSWORD: 'password'
+            KAFKA_SSL_TRUSTSTORE_LOCATION: '/etc/kafka/secrets/kafka.truststore.jks'
+            KAFKA_SSL_TRUSTSTORE_PASSWORD: 'password'
+            KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ''
+            KAFKA_SSL_CLIENT_AUTH: 'required'
+            KAFKA_LISTENER_NAME_EXTERNAL_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin" user_admin="admin";'
+        volumes:
+            - ./certs/kafka.truststore.jks:/etc/kafka/secrets/kafka.truststore.jks
+            - ./certs/kafka.keystore.jks:/etc/kafka/secrets/kafka.keystore.jks
+
+    kafka-2:
+        container_name: kafka-2
+        image: confluentinc/cp-kafka:5.4.0
+        platform: linux/amd64
+        depends_on:
+            - zookeeper
+        ports:
+            - '39094:39094'
+        environment:
+            KAFKA_BROKER_ID: 2
+            KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+            KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,EXTERNAL:SASL_SSL'
+            KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-2:19094,EXTERNAL://localhost:39094'
+            KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+            KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN'
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+            KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+            KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+            KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+            KAFKA_SSL_KEYSTORE_LOCATION: '/etc/kafka/secrets/kafka.keystore.jks'
+            KAFKA_SSL_KEYSTORE_PASSWORD: 'password'
+            KAFKA_SSL_KEY_PASSWORD: 'password'
+            KAFKA_SSL_TRUSTSTORE_LOCATION: '/etc/kafka/secrets/kafka.truststore.jks'
+            KAFKA_SSL_TRUSTSTORE_PASSWORD: 'password'
+            KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ''
+            KAFKA_SSL_CLIENT_AUTH: 'required'
+            KAFKA_LISTENER_NAME_EXTERNAL_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin" user_admin="admin";'
+        volumes:
+            - ./certs/kafka.truststore.jks:/etc/kafka/secrets/kafka.truststore.jks
+            - ./certs/kafka.keystore.jks:/etc/kafka/secrets/kafka.keystore.jks
+

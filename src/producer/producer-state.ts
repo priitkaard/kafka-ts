@@ -1,5 +1,5 @@
-import { API } from "../api";
-import { Cluster } from "../cluster";
+import { API } from '../api';
+import { Cluster } from '../cluster';
 
 type ProducerStateOptions = {
     cluster: Cluster;

@@ -23,7 +23,7 @@ const emitter = new EventEmitter();
             await new Promise((resolve) => emitter.once('drain', resolve));
             continue;
         }
-    
+
         void (async () => {
             pendingRequests++;
             await producer.send([{ topic: 'my-topic', value: 'ping' }]);

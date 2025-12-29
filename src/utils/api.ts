@@ -4,7 +4,10 @@ import { Encoder } from './encoder';
 export type Api<Request, Response> = {
     apiKey: number;
     apiVersion: number;
-    request: (encoder: Encoder, body: Request) => Encoder;
+    requestHeaderVersion: 1 | 2;
+    responseHeaderVersion: 0 | 1;
+    fallback?: Api<Request, Response>;
+    request: (encoder: Encoder, data: Request) => Encoder;
     response: (buffer: Decoder) => Promise<Response> | Response;
 };
 

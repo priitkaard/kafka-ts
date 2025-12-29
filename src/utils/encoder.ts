@@ -152,6 +152,22 @@ export class Encoder {
         return this;
     }
 
+    public writeTagBuffer(tags?: Record<number, Buffer>) {
+        if (!tags) return this.writeUVarInt(0);
+
+        const entries = Object.entries(tags)
+            .map(([k, v]) => [Number(k), v] as const)
+            .sort(([a], [b]) => a - b);
+
+        this.writeUVarInt(entries.length);
+        for (const [tagId, tagBuffer] of entries) {
+            this.writeUVarInt(tagId);
+            this.writeUVarInt(tagBuffer.length);
+            this.write(tagBuffer);
+        }
+        return this;
+    }
+
     public value() {
         return this.buffer.subarray(0, this.offset);
     }

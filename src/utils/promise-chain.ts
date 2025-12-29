@@ -13,13 +13,13 @@ export class PromiseChain {
         try {
             await callback();
         } finally {
-            releases.reverse().forEach((release) => release()); 
+            releases.reverse().forEach((release) => release());
         }
     }
 
     private async acquire(key: string): Promise<() => void> {
         const previousTail = this.locks.get(key);
-        
+
         let release: () => void;
         const currentTail = new Promise<void>((resolve) => (release = resolve));
 

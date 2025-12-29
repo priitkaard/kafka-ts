@@ -8,10 +8,8 @@ import { kafka } from './client';
         topics: ['my-topic'],
         allowTopicAutoCreation: true,
         onBatch: (batch) => {
-            log.info(
-                `Received batch: ${JSON.stringify(batch, jsonSerializer)}`,
-            );
-            log.info(`Latency: ${Date.now() - parseInt(batch[0].timestamp.toString())}ms`)
+            log.info(`Received batch: ${JSON.stringify(batch, jsonSerializer)}`);
+            log.info(`Latency: ${Date.now() - parseInt(batch[0].timestamp.toString())}ms`);
         },
     });
 

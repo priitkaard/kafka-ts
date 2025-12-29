@@ -168,6 +168,9 @@ export class Decoder {
 
     public readBytes() {
         const length = this.readInt32();
+        if (length < 0) {
+            return null;
+        }
         return this.read(length);
     }
 
@@ -179,7 +182,17 @@ export class Decoder {
         return this.read(length);
     }
 
-    public readTagBuffer() {
-        this.readUVarInt();
+    public readTagBuffer(): Record<number, Buffer> {
+        const numTags = this.readUVarInt();
+        if (!numTags) return {};
+
+        const tags: Record<number, Buffer> = {};
+        for (let i = 0; i < numTags; i++) {
+            const tagId = this.readUVarInt();
+            const size = this.readUVarInt();
+            const value = this.read(size);
+            tags[tagId] = value;
+        }
+        return tags;
     }
 }
