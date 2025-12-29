@@ -2,6 +2,7 @@ import { createApi } from '../utils/api';
 import { Decoder } from '../utils/decoder';
 import { Encoder } from '../utils/encoder';
 import { KafkaTSApiError } from '../utils/error';
+import { log } from '../utils/logger';
 
 export type Assignment = { [topic: string]: number[] };
 
@@ -25,9 +26,54 @@ type SyncGroupResponse = {
     errorCode: number;
     protocolType: string | null;
     protocolName: string | null;
-    assignments: Assignment;
+    assignment: Assignment;
     tags: Record<number, Buffer>;
 };
+
+/*
+SyncGroup Request (Version: 3) => group_id generation_id member_id group_instance_id [assignments] 
+  group_id => STRING
+  generation_id => INT32
+  member_id => STRING
+  group_instance_id => NULLABLE_STRING
+  assignments => member_id assignment 
+    member_id => STRING
+    assignment => BYTES
+
+SyncGroup Response (Version: 3) => throttle_time_ms error_code assignment 
+  throttle_time_ms => INT32
+  error_code => INT16
+  assignment => BYTES
+*/
+const SYNC_GROUP_V3 = createApi<SyncGroupRequest, SyncGroupResponse>({
+    apiKey: 14,
+    apiVersion: 3,
+    requestHeaderVersion: 1,
+    responseHeaderVersion: 0,
+    request: (encoder, data) =>
+        encoder
+            .writeString(data.groupId)
+            .writeInt32(data.generationId)
+            .writeString(data.memberId)
+            .writeString(data.groupInstanceId)
+            .writeArray(data.assignments, (encoder, assignment) =>
+                encoder
+                    .writeString(assignment.memberId)
+                    .writeBytes(encodeAssignment(assignment.assignment)),
+            ),
+    response: (decoder) => {
+        const result = {
+            throttleTimeMs: decoder.readInt32(),
+            errorCode: decoder.readInt16(),
+            protocolType: null,
+            protocolName: null,
+            assignment: decodeAssignment(decoder.readBytes()),
+            tags: {},
+        };
+        if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
+        return result;
+    },
+});
 
 /*
 SyncGroup Request (Version: 4) => group_id generation_id member_id group_instance_id [assignments] _tagged_fields 
@@ -47,6 +93,7 @@ SyncGroup Response (Version: 4) => throttle_time_ms error_code assignment _tagge
 const SYNC_GROUP_V4 = createApi<SyncGroupRequest, SyncGroupResponse>({
     apiKey: 14,
     apiVersion: 4,
+    fallback: SYNC_GROUP_V3,
     requestHeaderVersion: 2,
     responseHeaderVersion: 1,
     request: (encoder, data) =>
@@ -68,7 +115,7 @@ const SYNC_GROUP_V4 = createApi<SyncGroupRequest, SyncGroupResponse>({
             errorCode: decoder.readInt16(),
             protocolType: null,
             protocolName: null,
-            assignments: decodeAssignment(decoder.readCompactBytes()!),
+            assignment: decodeAssignment(decoder.readCompactBytes()),
             tags: decoder.readTagBuffer(),
         };
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
@@ -122,7 +169,7 @@ export const SYNC_GROUP = createApi<SyncGroupRequest, SyncGroupResponse>({
             errorCode: decoder.readInt16(),
             protocolType: decoder.readCompactString(),
             protocolName: decoder.readCompactString(),
-            assignments: decodeAssignment(decoder.readCompactBytes()!),
+            assignment: decodeAssignment(decoder.readCompactBytes()),
             tags: decoder.readTagBuffer(),
         };
         if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
@@ -139,7 +186,11 @@ const encodeAssignment = (data: Assignment) =>
         .writeBytes(Buffer.alloc(0))
         .value();
 
-const decodeAssignment = (data: Buffer): Assignment => {
+const decodeAssignment = (data: Buffer | null): Assignment => {
+    if (!data) {
+        return {};
+    }
+
     const decoder = new Decoder(data);
     if (!decoder.getBufferLength()) {
         return {};

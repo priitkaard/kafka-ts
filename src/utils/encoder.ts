@@ -124,7 +124,8 @@ export class Encoder {
         return this.writeInt8(value ? 1 : 0);
     }
 
-    public writeArray<T>(arr: T[], callback: (encoder: Encoder, item: T) => void) {
+    public writeArray<T>(arr: T[] | null, callback: (encoder: Encoder, item: T) => void) {
+        if (arr === null) return this.writeInt32(-1);
         this.writeInt32(arr.length);
         for (const it of arr) callback(this, it);
         return this;
@@ -141,12 +142,22 @@ export class Encoder {
         return this;
     }
 
-    public writeBytes(value: Buffer) {
+    public writeBytes(value: Buffer | null) {
+        if (value === null) {
+            this.writeInt32(-1);
+            return this;
+        }
+
         this.writeInt32(value.length);
         this.write(value);
         return this;
     }
-    public writeCompactBytes(value: Buffer) {
+    public writeCompactBytes(value: Buffer | null) {
+        if (value === null) {
+            this.writeUVarInt(0);
+            return this;
+        }
+
         this.writeUVarInt(value.length + 1);
         this.write(value);
         return this;

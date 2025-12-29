@@ -134,8 +134,6 @@ export class ConsumerGroup {
                     assignment,
                 }));
                 log.debug('Assigned partitions to members', { assignments });
-            } else {
-                log.debug('Received assignment from leader', { memberId: this.memberId, leaderId: this.leaderId, assignments });
             }
 
             const response = await cluster.sendRequest(API.SYNC_GROUP, {
@@ -147,7 +145,8 @@ export class ConsumerGroup {
                 protocolName: 'RoundRobinAssigner',
                 assignments,
             });
-            metadata.setAssignment(response.assignments);
+            metadata.setAssignment(response.assignment);
+            log.debug('Updated member assignment', { assignment: response.assignment });
         });
     }
 

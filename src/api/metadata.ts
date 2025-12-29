@@ -65,7 +65,7 @@ const METADATA_V0 = createApi<MetadataRequest, MetadataResponse>({
     requestHeaderVersion: 1,
     responseHeaderVersion: 0,
     request: (encoder, data) =>
-        encoder.writeArray(data.topics ?? [], (encoder, topic) => encoder.writeString(topic.name)),
+        encoder.writeArray(data.topics ?? null, (encoder, topic) => encoder.writeString(topic.name)),
     response: (decoder) => {
         const result = {
             throttleTimeMs: 0,
@@ -87,9 +87,87 @@ const METADATA_V0 = createApi<MetadataRequest, MetadataResponse>({
                     partitionIndex: decoder.readInt32(),
                     leaderId: decoder.readInt32(),
                     leaderEpoch: -1,
-                    replicaNodes: decoder.readArray(() => decoder.readInt32()),
-                    isrNodes: decoder.readArray(() => decoder.readInt32()),
+                    replicaNodes: decoder.readArray((decoder) => decoder.readInt32()),
+                    isrNodes: decoder.readArray((decoder) => decoder.readInt32()),
                     offlineReplicas: [],
+                    tags: {},
+                })),
+                topicAuthorizedOperations: -1,
+                tags: {},
+            })),
+            tags: {},
+        };
+        result.topics.forEach((topic) => {
+            if (topic.errorCode) throw new KafkaTSApiError(topic.errorCode, null, result);
+            topic.partitions.forEach((partition) => {
+                if (partition.errorCode) throw new KafkaTSApiError(partition.errorCode, null, result);
+            });
+        });
+        return result;
+    },
+});
+
+/*
+Metadata Request (Version: 6) => [topics] allow_auto_topic_creation 
+  topics => name 
+    name => STRING
+  allow_auto_topic_creation => BOOLEAN
+
+Metadata Response (Version: 6) => throttle_time_ms [brokers] cluster_id controller_id [topics] 
+  throttle_time_ms => INT32
+  brokers => node_id host port rack 
+    node_id => INT32
+    host => STRING
+    port => INT32
+    rack => NULLABLE_STRING
+  cluster_id => NULLABLE_STRING
+  controller_id => INT32
+  topics => error_code name is_internal [partitions] 
+    error_code => INT16
+    name => STRING
+    is_internal => BOOLEAN
+    partitions => error_code partition_index leader_id [replica_nodes] [isr_nodes] [offline_replicas] 
+      error_code => INT16
+      partition_index => INT32
+      leader_id => INT32
+      replica_nodes => INT32
+      isr_nodes => INT32
+      offline_replicas => INT32
+*/
+const METADATA_V6 = createApi<MetadataRequest, MetadataResponse>({
+    apiKey: 3,
+    apiVersion: 6,
+    fallback: METADATA_V0,
+    requestHeaderVersion: 1,
+    responseHeaderVersion: 0,
+    request: (encoder, data) =>
+        encoder
+            .writeArray(data.topics ?? null, (encoder, topic) => encoder.writeString(topic.name))
+            .writeBoolean(data.allowTopicAutoCreation ?? false),
+    response: (decoder) => {
+        const result = {
+            throttleTimeMs: decoder.readInt32(),
+            brokers: decoder.readArray((decoder) => ({
+                nodeId: decoder.readInt32(),
+                host: decoder.readString()!,
+                port: decoder.readInt32(),
+                rack: decoder.readString(),
+            })),
+            clusterId: decoder.readString(),
+            controllerId: decoder.readInt32(),
+            topics: decoder.readArray((decoder) => ({
+                errorCode: decoder.readInt16(),
+                name: decoder.readString()!,
+                topicId: '',
+                isInternal: decoder.readBoolean(),
+                partitions: decoder.readArray((decoder) => ({
+                    errorCode: decoder.readInt16(),
+                    partitionIndex: decoder.readInt32(),
+                    leaderId: decoder.readInt32(),
+                    leaderEpoch: -1,
+                    replicaNodes: decoder.readArray((decoder) => decoder.readInt32()),
+                    isrNodes: decoder.readArray((decoder) => decoder.readInt32()),
+                    offlineReplicas: decoder.readArray((decoder) => decoder.readInt32()),
                     tags: {},
                 })),
                 topicAuthorizedOperations: -1,
@@ -142,7 +220,7 @@ Metadata Response (Version: 12) => throttle_time_ms [brokers] cluster_id control
 export const METADATA = createApi<MetadataRequest, MetadataResponse>({
     apiKey: 3,
     apiVersion: 12,
-    fallback: METADATA_V0,
+    fallback: METADATA_V6,
     requestHeaderVersion: 2,
     responseHeaderVersion: 1,
     request: (encoder, data) =>

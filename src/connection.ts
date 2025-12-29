@@ -126,7 +126,7 @@ export class Connection {
             .writeInt16(api.apiKey)
             .writeInt16(api.apiVersion)
             .writeInt32(correlationId)
-            .writeString(this.options.clientId);
+            .writeString(this.options.clientId ?? '');
         if (api.requestHeaderVersion === 2) encoder.writeTagBuffer();
 
         const request = api.request(encoder, body);

@@ -23,6 +23,54 @@ type LeaveGroupResponse = {
 };
 
 /*
+LeaveGroup Request (Version: 3) => group_id [members] 
+  group_id => STRING
+  members => member_id group_instance_id 
+    member_id => STRING
+    group_instance_id => NULLABLE_STRING
+
+LeaveGroup Response (Version: 3) => throttle_time_ms error_code [members] 
+  throttle_time_ms => INT32
+  error_code => INT16
+  members => member_id group_instance_id error_code 
+    member_id => STRING
+    group_instance_id => NULLABLE_STRING
+    error_code => INT16
+*/
+const LEAVE_GROUP_V3 = createApi<LeaveGroupRequest, LeaveGroupResponse>({
+    apiKey: 13,
+    apiVersion: 3,
+    requestHeaderVersion: 1,
+    responseHeaderVersion: 0,
+    request: (encoder, body) =>
+        encoder
+            .writeString(body.groupId)
+            .writeArray(body.members, (encoder, member) =>
+                encoder
+                    .writeString(member.memberId)
+                    .writeString(member.groupInstanceId),
+            ),
+    response: (decoder) => {
+        const result = {
+            throttleTimeMs: decoder.readInt32(),
+            errorCode: decoder.readInt16(),
+            members: decoder.readArray((decoder) => ({
+                memberId: decoder.readString()!,
+                groupInstanceId: decoder.readString(),
+                errorCode: decoder.readInt16(),
+                tags: {},
+            })),
+            tags: {},
+        };
+        if (result.errorCode) throw new KafkaTSApiError(result.errorCode, null, result);
+        result.members.forEach((member) => {
+            if (member.errorCode) throw new KafkaTSApiError(member.errorCode, null, result);
+        });
+        return result;
+    },
+});
+
+/*
 LeaveGroup Request (Version: 4) => group_id [members] _tagged_fields 
   group_id => COMPACT_STRING
   members => member_id group_instance_id _tagged_fields 
@@ -41,6 +89,7 @@ LeaveGroup Response (Version: 4) => throttle_time_ms error_code [members] _tagge
 const LEAVE_GROUP_V4 = createApi<LeaveGroupRequest, LeaveGroupResponse>({
     apiKey: 13,
     apiVersion: 4,
+    fallback: LEAVE_GROUP_V3,
     requestHeaderVersion: 2,
     responseHeaderVersion: 1,
     request: (encoder, body) =>
