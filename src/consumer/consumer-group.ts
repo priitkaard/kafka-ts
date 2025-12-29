@@ -133,6 +133,9 @@ export class ConsumerGroup {
                     memberId,
                     assignment,
                 }));
+                log.debug('Assigned partitions to members', { assignments });
+            } else {
+                log.debug('Received assignment from leader', { memberId: this.memberId, leaderId: this.leaderId, assignments });
             }
 
             const response = await cluster.sendRequest(API.SYNC_GROUP, {
