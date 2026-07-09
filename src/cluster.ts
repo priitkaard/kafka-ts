@@ -124,7 +124,7 @@ export class Cluster {
                 await broker.connect();
                 return broker;
             } catch (error) {
-                log.debug(`Failed to connect to seed broker ${options.host}:${options.port}`, {
+                log.warn(`Failed to connect to seed broker ${options.host}:${options.port}`, {
                     reason: (error as Error).message,
                 });
             }
