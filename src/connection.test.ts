@@ -120,10 +120,10 @@ describe('Connection', () => {
         const connection = createConnection(port);
         await connection.connect();
 
-        const inFlight = connection.sendRequest(API.API_VERSIONS, {});
+        const inFlight = expect(connection.sendRequest(API.API_VERSIONS, {})).rejects.toThrow(ConnectionError);
         await connection.connect();
 
-        await expect(inFlight).rejects.toThrow(ConnectionError);
+        await inFlight;
 
         await connection.disconnect();
     });
@@ -267,7 +267,7 @@ describe('Connection', () => {
 
     it('keeps working when the correlation id reaches the int32 limit', async () => {
         const port = await startServer((socket) => {
-            socket.on('data', (data) => {
+            socket.on('data', (data: Buffer) => {
                 let offset = 0;
                 while (offset + 4 <= data.length) {
                     const size = data.readInt32BE(offset);

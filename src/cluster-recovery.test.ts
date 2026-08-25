@@ -44,7 +44,7 @@ class FakeBroker {
         this.server = net.createServer({ allowHalfOpen: true }, (socket) => {
             this.sockets.push(socket);
             socket.on('error', () => {});
-            socket.on('data', (data) => this.handleRequest(socket, data));
+            socket.on('data', (data: Buffer) => this.handleRequest(socket, data));
         });
         await new Promise<void>((resolve) => this.server!.listen(port, '127.0.0.1', resolve));
         this.port = (this.server!.address() as AddressInfo).port;

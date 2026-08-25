@@ -204,7 +204,7 @@ describe.sequential('Low-level API', () => {
                 partition.records.forEach((record) => {
                     expect(record.baseTimestamp).toBeGreaterThan(1721926744730n);
                     expect(record.maxTimestamp).toBeGreaterThan(1721926744730n);
-                    expect(record.crc).toBeGreaterThan(0);
+                    expect(record.crc).not.toBe(0);
 
                     record.baseTimestamp = 0n;
                     record.maxTimestamp = 0n;
