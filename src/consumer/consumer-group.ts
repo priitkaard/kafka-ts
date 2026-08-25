@@ -32,6 +32,7 @@ export class ConsumerGroup {
     private memberIds: string[] = [];
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private heartbeatError: KafkaTSError | null = null;
+    private isHeartbeating = false;
 
     constructor(private options: ConsumerGroupOptions) {}
 
@@ -54,6 +55,9 @@ export class ConsumerGroup {
         this.heartbeatError = null;
 
         this.heartbeatInterval = setInterval(async () => {
+            if (this.isHeartbeating) return;
+            this.isHeartbeating = true;
+
             try {
                 await this.heartbeat();
             } catch (error) {
@@ -61,6 +65,8 @@ export class ConsumerGroup {
                 if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
                     this.options.consumer.emit('rebalanceInProgress');
                 }
+            } finally {
+                this.isHeartbeating = false;
             }
         }, 5000);
     }
@@ -70,6 +76,7 @@ export class ConsumerGroup {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
         }
+        this.isHeartbeating = false;
     }
 
     public handleLastHeartbeat() {

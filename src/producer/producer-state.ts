@@ -1,13 +1,18 @@
 import { API } from '../api';
 import { Cluster } from '../cluster';
 
+const MAX_INT32 = 2 ** 31 - 1;
+
+const incrementSequence = (sequence: number, increment: number) =>
+    sequence > MAX_INT32 - increment ? increment - (MAX_INT32 - sequence) - 1 : sequence + increment;
+
 type ProducerStateOptions = {
     cluster: Cluster;
 };
 
 export class ProducerState {
     public producerId = 0n;
-    private producerEpoch = 0;
+    public producerEpoch = 0;
     private sequences: Record<string, Record<number, number>> = {};
 
     constructor(private options: ProducerStateOptions) {}
@@ -24,6 +29,12 @@ export class ProducerState {
         this.sequences = {};
     }
 
+    public reset() {
+        this.producerId = 0n;
+        this.producerEpoch = 0;
+        this.sequences = {};
+    }
+
     public getSequence(topic: string, partition: number) {
         return this.sequences[topic]?.[partition] ?? 0;
     }
@@ -31,6 +42,6 @@ export class ProducerState {
     public updateSequence(topic: string, partition: number, messagesCount: number) {
         this.sequences[topic] ??= {};
         this.sequences[topic][partition] ??= 0;
-        this.sequences[topic][partition] += messagesCount;
+        this.sequences[topic][partition] = incrementSequence(this.sequences[topic][partition], messagesCount);
     }
 }

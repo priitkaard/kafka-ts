@@ -2,6 +2,7 @@ import { TcpSocketConnectOpts } from 'net';
 import { TLSSocketOptions } from 'tls';
 import { API } from './api';
 import { Connection, SendRequest } from './connection';
+import { withTimeout } from './utils/timeout';
 
 export type SASLProvider = {
     mechanism: string;
@@ -14,6 +15,7 @@ type BrokerOptions = {
     sasl: SASLProvider | null;
     ssl: TLSSocketOptions | null;
     requestTimeout: number;
+    connectTimeout: number;
 };
 
 export class Broker {
@@ -26,18 +28,35 @@ export class Broker {
             connection: this.options.options,
             ssl: this.options.ssl,
             requestTimeout: this.options.requestTimeout,
+            connectTimeout: this.options.connectTimeout,
         });
         this.sendRequest = this.connection.sendRequest.bind(this.connection);
     }
 
     public async connect() {
-        if (!this.connection.isConnected()) {
-            await this.connection.connect();
-            await this.fetchApiVersions();
-            await this.saslHandshake();
-            await this.saslAuthenticate();
+        if (this.connection.isConnected()) {
+            return this;
+        }
+        await this.connection.connect();
+
+        const { host, port } = this.options.options;
+        try {
+            await withTimeout(
+                this.handshake(),
+                this.options.connectTimeout,
+                `Handshake with ${host}:${port} timed out`,
+            );
+        } catch (error) {
+            await this.disconnect().catch(() => {});
+            throw error;
         }
         return this;
+    }
+
+    private async handshake() {
+        await this.fetchApiVersions();
+        await this.saslHandshake();
+        await this.saslAuthenticate();
     }
 
     public async disconnect() {

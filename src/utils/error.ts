@@ -27,3 +27,16 @@ export class ConnectionError extends KafkaTSError {
         this.stack += `\n${stack}`;
     }
 }
+
+export const getErrorMessage = (error: unknown): string => {
+    if (!(error instanceof Error)) return String(error);
+
+    if (error instanceof AggregateError) {
+        const messages = (error.errors as unknown[])
+            .map((cause) => (cause instanceof Error ? getErrorMessage(cause) : String(cause)))
+            .filter(Boolean);
+        if (messages.length) return messages.join(', ');
+    }
+
+    return error.message || (error as NodeJS.ErrnoException).code || error.name;
+};

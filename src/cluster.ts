@@ -17,6 +17,7 @@ type ClusterOptions = {
     sasl: SASLProvider | null;
     ssl: TLSSocketOptions | null;
     requestTimeout: number;
+    connectTimeout: number;
 };
 
 export class Cluster {
@@ -27,17 +28,30 @@ export class Cluster {
     constructor(private options: ClusterOptions) {}
 
     public async connect() {
-        this.seedBroker = await this.findSeedBroker();
-        this.brokerById = {};
+        const seedBroker = await this.findSeedBroker();
 
-        await this.refreshBrokerMetadata();
+        const staleBrokers = [this.seedBroker, ...Object.values(this.brokerById)];
+        this.seedBroker = seedBroker;
+        this.brokerById = {};
+        await Promise.all(staleBrokers.map((broker) => this.safeDisconnect(broker)));
+
+        try {
+            await this.refreshBrokerMetadata();
+        } catch (error) {
+            this.seedBroker = undefined;
+            await this.safeDisconnect(seedBroker);
+            throw error;
+        }
     }
 
     public async disconnect() {
-        await Promise.all([
-            this.seedBroker?.disconnect(),
-            ...Object.values(this.brokerById).map((x) => x.disconnect()),
-        ]);
+        const brokers = [this.seedBroker, ...Object.values(this.brokerById)];
+
+        this.seedBroker = undefined;
+        this.brokerById = {};
+        this.brokerMetadata = {};
+
+        await Promise.all(brokers.map((broker) => this.safeDisconnect(broker)));
     }
 
     public ensureConnected = shared(async () => {
@@ -45,31 +59,28 @@ export class Cluster {
             return this.connect();
         }
 
-        const brokers = [
-            {
-                broker: this.seedBroker,
-                handleError: async (error: Error) => {
-                    log.debug(`Failed to connect to seed broker. Reconnecting...`, { reason: error.message });
-                    await this.seedBroker?.disconnect();
-                    this.seedBroker = await this.findSeedBroker();
-                },
-            },
-            ...Object.entries(this.brokerById).map(([nodeId, broker]) => ({
-                broker,
-                handleError: async (error: Error) => {
-                    log.debug(`Failed to connect to broker ${nodeId}. Disconnecting...`, { reason: error.message });
-                    await broker.disconnect();
-                    delete this.brokerById[parseInt(nodeId)];
-                },
-            })),
-        ];
+        try {
+            await this.seedBroker.connect();
+        } catch (error) {
+            log.debug(`Failed to connect to seed broker. Reconnecting...`, { reason: (error as Error).message });
+
+            const staleBroker = this.seedBroker;
+            this.seedBroker = undefined;
+            this.brokerMetadata = {};
+            await this.safeDisconnect(staleBroker);
+
+            return this.connect();
+        }
 
         await Promise.all(
-            brokers.map(async ({ broker, handleError }) => {
+            Object.entries(this.brokerById).map(async ([nodeId, broker]) => {
                 try {
                     await broker.connect();
                 } catch (error) {
-                    await handleError(error as Error);
+                    log.debug(`Failed to connect to broker ${nodeId}. Disconnecting...`, {
+                        reason: (error as Error).message,
+                    });
+                    await this.evictBroker(parseInt(nodeId), broker);
                 }
             }),
         );
@@ -77,22 +88,56 @@ export class Cluster {
 
     public setSeedBroker = async (nodeId: number) => {
         const broker = await this.acquireBroker(nodeId);
-        await this.seedBroker?.disconnect();
+        const staleBroker = this.seedBroker;
         this.seedBroker = broker;
+        await this.safeDisconnect(staleBroker);
     };
 
     public sendRequest: SendRequest = async (...args) => {
-        return this.seedBroker!.sendRequest(...args);
+        if (!this.seedBroker) {
+            throw new ConnectionError('Cluster is not connected');
+        }
+        return this.seedBroker.sendRequest(...args);
     };
 
     public sendRequestToNode =
         (nodeId: number): SendRequest =>
         async (...args) => {
-            if (!this.brokerById[nodeId]) {
-                this.brokerById[nodeId] = await this.acquireBroker(nodeId);
+            const broker = await this.getBroker(nodeId);
+            try {
+                return await broker.sendRequest(...args);
+            } catch (error) {
+                if (error instanceof ConnectionError) {
+                    await this.evictBroker(nodeId, broker);
+                }
+                throw error;
             }
-            return this.brokerById[nodeId].sendRequest(...args);
         };
+
+    private acquireBrokerShared = shared((nodeId: number) => this.acquireBroker(nodeId));
+
+    private async getBroker(nodeId: number) {
+        const existingBroker = this.brokerById[nodeId];
+        if (existingBroker) return existingBroker;
+
+        const broker = await this.acquireBrokerShared(nodeId);
+
+        const currentBroker = this.brokerById[nodeId];
+        if (currentBroker && currentBroker !== broker) {
+            await this.safeDisconnect(broker);
+            return currentBroker;
+        }
+
+        this.brokerById[nodeId] = broker;
+        return broker;
+    }
+
+    private async evictBroker(nodeId: number, broker: Broker) {
+        if (this.brokerById[nodeId] !== broker) return;
+
+        delete this.brokerById[nodeId];
+        await this.safeDisconnect(broker);
+    }
 
     @trace((nodeId) => ({ nodeId, result: `<Broker ${nodeId}>` }))
     public async acquireBroker(nodeId: number) {
@@ -104,26 +149,35 @@ export class Cluster {
             sasl: this.options.sasl,
             ssl: this.options.ssl,
             requestTimeout: this.options.requestTimeout,
+            connectTimeout: this.options.connectTimeout,
             options: this.brokerMetadata[nodeId],
         });
-        await broker.connect();
+        try {
+            await broker.connect();
+        } catch (error) {
+            await this.safeDisconnect(broker);
+            throw error;
+        }
         return broker;
     }
 
     private async findSeedBroker() {
         const randomizedBrokers = this.options.bootstrapServers.toSorted(() => Math.random() - 0.5);
         for (const options of randomizedBrokers) {
+            const broker = new Broker({
+                clientId: this.options.clientId,
+                sasl: this.options.sasl,
+                ssl: this.options.ssl,
+                requestTimeout: this.options.requestTimeout,
+                connectTimeout: this.options.connectTimeout,
+                options,
+            });
             try {
-                const broker = new Broker({
-                    clientId: this.options.clientId,
-                    sasl: this.options.sasl,
-                    ssl: this.options.ssl,
-                    requestTimeout: this.options.requestTimeout,
-                    options,
-                });
                 await broker.connect();
                 return broker;
             } catch (error) {
+                await this.safeDisconnect(broker);
+
                 log.warn(`Failed to connect to seed broker ${options.host}:${options.port}`, {
                     reason: (error as Error).message,
                 });
@@ -135,5 +189,11 @@ export class Cluster {
     private async refreshBrokerMetadata() {
         const metadata = await this.sendRequest(API.METADATA, { topics: [] });
         this.brokerMetadata = Object.fromEntries(metadata.brokers.map((options) => [options.nodeId, options]));
+    }
+
+    private async safeDisconnect(broker: Broker | undefined) {
+        await broker?.disconnect().catch((error) => {
+            log.debug('Failed to disconnect broker', { reason: (error as Error).message });
+        });
     }
 }

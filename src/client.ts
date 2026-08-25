@@ -11,6 +11,7 @@ export type ClientOptions = {
     sasl?: SASLProvider | null;
     ssl?: TLSSocketOptions | null;
     requestTimeout?: number;
+    connectTimeout?: number;
 };
 
 export class Client {
@@ -23,6 +24,7 @@ export class Client {
             sasl: options.sasl ?? null,
             ssl: options.ssl ?? null,
             requestTimeout: options.requestTimeout ?? 60_000,
+            connectTimeout: options.connectTimeout ?? 10_000,
         };
     }
 
@@ -43,6 +45,7 @@ export class Client {
             sasl: this.options.sasl,
             ssl: this.options.ssl,
             requestTimeout: this.options.requestTimeout,
+            connectTimeout: this.options.connectTimeout,
         });
     }
 }

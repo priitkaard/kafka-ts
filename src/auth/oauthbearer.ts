@@ -1,9 +1,12 @@
 import { API } from '../api';
 import { SASLProvider } from '../broker';
+import { getErrorMessage } from '../utils/error';
+import { log } from '../utils/logger';
 import { clamp } from '../utils/number';
 import { exponentialBackoff, withRetry } from '../utils/retry';
 
 const MAX_INT = Math.pow(2, 31) - 1;
+const RETRY_DELAY_MS = 1_000;
 
 export const oAuthBearer = (getToken: () => Promise<{ access_token: string }>): SASLProvider => {
     return {
@@ -29,25 +32,38 @@ export const oAuthAuthenticator = ({
     clientSecret: string;
     refreshThresholdSeconds?: number;
 }) => {
-    let tokenPromise = createToken(endpoint, {
-        grant_type: 'client_credentials',
-        client_id: clientId,
-        client_secret: clientSecret,
-    });
+    const requestToken = (refreshToken?: string) =>
+        createToken(
+            endpoint,
+            refreshToken
+                ? {
+                      grant_type: 'refresh_token',
+                      client_id: clientId,
+                      client_secret: clientSecret,
+                      refresh_token: refreshToken,
+                  }
+                : { grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret },
+        );
 
-    const scheduleRefresh = () => {
-        tokenPromise.then((token) => {
-            const refreshInMs = clamp((token.expires_in - refreshThresholdSeconds) * 1000, 1, MAX_INT);
-            setTimeout(() => {
-                tokenPromise = createToken(endpoint, {
-                    grant_type: 'refresh_token',
-                    client_id: clientId,
-                    client_secret: clientSecret,
-                    refresh_token: token.refresh_token,
-                });
-                scheduleRefresh();
-            }, refreshInMs);
-        });
+    let tokenPromise = requestToken();
+
+    const scheduleRefresh = async () => {
+        let token: TokenResponse | undefined;
+        try {
+            token = await tokenPromise;
+        } catch (error) {
+            log.warn('Failed to obtain OAuth token. Retrying...', { reason: getErrorMessage(error) });
+        }
+
+        const refreshInMs = token
+            ? clamp((token.expires_in - refreshThresholdSeconds) * 1000, 1, MAX_INT)
+            : RETRY_DELAY_MS;
+
+        const timeout = setTimeout(() => {
+            tokenPromise = requestToken(token?.refresh_token);
+            scheduleRefresh();
+        }, refreshInMs);
+        timeout.unref?.();
     };
     scheduleRefresh();
 

@@ -17,10 +17,10 @@ export const murmur2 = (data: Buffer): number => {
             ((data[i4 + 1] & 0xff) << 8) +
             ((data[i4 + 2] & 0xff) << 16) +
             ((data[i4 + 3] & 0xff) << 24);
-        k *= m;
-        k ^= k >> r;
-        k *= m;
-        h *= m;
+        k = Math.imul(k, m);
+        k ^= k >>> r;
+        k = Math.imul(k, m);
+        h = Math.imul(h, m);
         h ^= k;
     }
 
@@ -31,12 +31,12 @@ export const murmur2 = (data: Buffer): number => {
             h = h ^ ((data[(length & ~3) + 1] & 0xff) << 8);
         case 1:
             h = h ^ (data[length & ~3] & 0xff);
-            h *= m;
+            h = Math.imul(h, m);
     }
 
-    h ^= h >> 13;
-    h *= m;
-    h ^= h >> 15;
+    h ^= h >>> 13;
+    h = Math.imul(h, m);
+    h ^= h >>> 15;
 
     return h;
 };

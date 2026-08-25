@@ -10,7 +10,7 @@ export class Encoder {
         const need = this.offset + extra;
         if (need <= this.buffer.length) return;
         let cap = this.buffer.length;
-        while (cap < need) cap <<= 1;
+        while (cap < need) cap *= 2;
         const n = Buffer.allocUnsafe(cap);
         this.buffer.copy(n, 0, 0, this.offset);
         this.buffer = n;
