@@ -25,6 +25,16 @@ const apiVersionsResponse = (correlationId: number) =>
             .writeInt32(0),
     );
 
+const unsupportedApiVersionsResponse = (correlationId: number) =>
+    encodeFrame(
+        new Encoder()
+            .writeInt32(correlationId)
+            .writeInt16(35)
+            .writeArray([{ apiKey: API_VERSIONS, minVersion: 0, maxVersion: 2 }], (encoder, version) =>
+                encoder.writeInt16(version.apiKey).writeInt16(version.minVersion).writeInt16(version.maxVersion),
+            ),
+    );
+
 const metadataResponse = (correlationId: number, port: number) =>
     encodeFrame(
         new Encoder()
@@ -69,9 +79,11 @@ class FakeBroker {
             offset += 4 + size;
 
             const apiKey = request.readInt16BE(0);
+            const apiVersion = request.readInt16BE(2);
             const correlationId = request.readInt32BE(4);
 
-            if (apiKey === API_VERSIONS) socket.write(apiVersionsResponse(correlationId));
+            if (apiKey === API_VERSIONS && apiVersion > 2) socket.write(unsupportedApiVersionsResponse(correlationId));
+            if (apiKey === API_VERSIONS && apiVersion <= 2) socket.write(apiVersionsResponse(correlationId));
             if (apiKey === METADATA) socket.write(metadataResponse(correlationId, this.port));
         }
     }

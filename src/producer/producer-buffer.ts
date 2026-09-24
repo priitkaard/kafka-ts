@@ -114,7 +114,7 @@ export class ProducerBuffer {
     }
 
     private async createRequest(batch: Message[]) {
-        const { state } = this.options;
+        const { state, metadata } = this.options;
 
         if (!state.isInitialized) await state.initProducerId();
         const generation = state.generation;
@@ -130,6 +130,7 @@ export class ProducerBuffer {
 
         const topicData = Object.entries(topicPartitionMessages).map(([topic, partitionMessages]) => ({
             name: topic,
+            topicId: metadata.getTopicIdByName(topic),
             partitionData: Object.entries(partitionMessages).map(([partition, messages]) => {
                 const partitionIndex = parseInt(partition);
                 let baseTimestamp: bigint | undefined;
@@ -189,8 +190,9 @@ export class ProducerBuffer {
                     timeoutMs: 30000,
                     topicData: topicData
                         .filter(({ name }) => name in partitionsByTopic)
-                        .map(({ name, partitionData }) => ({
+                        .map(({ name, topicId, partitionData }) => ({
                             name,
+                            topicId,
                             partitionData: partitionData.filter(({ index }) => partitionsByTopic[name].includes(index)),
                         })),
                 });

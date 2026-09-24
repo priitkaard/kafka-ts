@@ -1,6 +1,6 @@
 import net, { AddressInfo, Server, Socket } from 'net';
 import { afterEach, describe, expect, it } from 'vitest';
-import { API } from './api';
+import { API_VERSIONS_V2 } from './api/api-versions/v2';
 import { Connection } from './connection';
 import { ConnectionError } from './utils/error';
 
@@ -102,7 +102,7 @@ describe('Connection', () => {
         const connection = createConnection(port);
         await connection.connect();
 
-        await expect(connection.sendRequest(API.API_VERSIONS, {})).rejects.toThrow(ConnectionError);
+        await expect(connection.sendRequest(API_VERSIONS_V2, {})).rejects.toThrow(ConnectionError);
     });
 
     it('fails fast instead of writing to a disconnected socket', async () => {
@@ -112,7 +112,7 @@ describe('Connection', () => {
         await connection.connect();
         await connection.disconnect();
 
-        await expect(connection.sendRequest(API.API_VERSIONS, {})).rejects.toThrow(ConnectionError);
+        await expect(connection.sendRequest(API_VERSIONS_V2, {})).rejects.toThrow(ConnectionError);
     });
 
     it('does not emit an unhandled error event when the peer resets during teardown', async () => {
@@ -143,7 +143,7 @@ describe('Connection', () => {
         const connection = createConnection(port);
         await connection.connect();
 
-        const inFlight = expect(connection.sendRequest(API.API_VERSIONS, {})).rejects.toThrow(ConnectionError);
+        const inFlight = expect(connection.sendRequest(API_VERSIONS_V2, {})).rejects.toThrow(ConnectionError);
         await connection.connect();
 
         await inFlight;
@@ -162,7 +162,7 @@ describe('Connection', () => {
         const countTimers = () => process.getActiveResourcesInfo().filter((resource) => resource === 'Timeout').length;
 
         const timersBefore = countTimers();
-        await expect(connection.sendRequest(API.API_VERSIONS, {})).rejects.toThrow(ConnectionError);
+        await expect(connection.sendRequest(API_VERSIONS_V2, {})).rejects.toThrow(ConnectionError);
 
         expect(countTimers()).toBe(timersBefore);
     });
@@ -220,7 +220,7 @@ describe('Connection', () => {
         const onUncaught = (error: Error) => uncaught.push(error);
         process.on('uncaughtException', onUncaught);
         try {
-            await expect(connection.sendRequest(API.API_VERSIONS, {})).rejects.toThrow(ConnectionError);
+            await expect(connection.sendRequest(API_VERSIONS_V2, {})).rejects.toThrow(ConnectionError);
             await new Promise((resolve) => setTimeout(resolve, 100));
         } finally {
             process.off('uncaughtException', onUncaught);
@@ -255,10 +255,11 @@ describe('Connection', () => {
         const connection = createConnection(port);
         await connection.connect();
 
-        await expect(connection.sendRequest(API.API_VERSIONS, {})).resolves.toEqual({
+        await expect(connection.sendRequest(API_VERSIONS_V2, {})).resolves.toEqual({
             errorCode: 0,
-            versions: [{ apiKey: 18, minVersion: 0, maxVersion: 3 }],
+            versions: [{ apiKey: 18, minVersion: 0, maxVersion: 3, tags: {} }],
             throttleTimeMs: 0,
+            tags: {},
         });
 
         await connection.disconnect();
@@ -324,7 +325,7 @@ describe('Connection', () => {
         (connection as any).lastCorrelationId = 2_147_483_645;
 
         for (let i = 0; i < 4; i++) {
-            await expect(connection.sendRequest(API.API_VERSIONS, {})).resolves.toBeTruthy();
+            await expect(connection.sendRequest(API_VERSIONS_V2, {})).resolves.toBeTruthy();
         }
 
         await connection.disconnect();
@@ -344,7 +345,7 @@ describe('Connection', () => {
         const connection = createConnection(port);
         await connection.connect();
 
-        await expect(connection.sendRequest(API.API_VERSIONS, {})).rejects.toThrow(/timed out/);
+        await expect(connection.sendRequest(API_VERSIONS_V2, {})).rejects.toThrow(/timed out/);
         expect(connection.isConnected()).toBe(true);
 
         await connection.disconnect();
@@ -387,7 +388,7 @@ describe('Connection', () => {
         await connection.connect();
 
         await expect(
-            Promise.all([connection.sendRequest(API.API_VERSIONS, {}), connection.sendRequest(API.API_VERSIONS, {})]),
+            Promise.all([connection.sendRequest(API_VERSIONS_V2, {}), connection.sendRequest(API_VERSIONS_V2, {})]),
         ).resolves.toHaveLength(2);
 
         await connection.disconnect();
@@ -406,7 +407,7 @@ describe('Connection', () => {
         const connection = createConnection(port);
         await connection.connect();
 
-        const request = connection.sendRequest(API.API_VERSIONS, {}).catch((error) => error);
+        const request = connection.sendRequest(API_VERSIONS_V2, {}).catch((error) => error);
         await new Promise((resolve) => setTimeout(resolve, 100));
 
         expect((connection as any).bufferedBytes).toBe(4 + 2 * 4096);

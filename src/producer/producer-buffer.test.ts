@@ -6,7 +6,10 @@ import { PromiseChain } from '../utils/promise-chain';
 import { ProducerBuffer } from './producer-buffer';
 import { ProducerState } from './producer-state';
 
-const metadata = { getTopicPartitionLeaderIds: () => ({ topic: { 0: 1 } }) } as unknown as Metadata;
+const metadata = {
+    getTopicPartitionLeaderIds: () => ({ topic: { 0: 1 } }),
+    getTopicIdByName: () => 'd6718d178e1b47c886441ad2d19faea5',
+} as unknown as Metadata;
 
 const giveUp = async (error: unknown) => {
     throw error;

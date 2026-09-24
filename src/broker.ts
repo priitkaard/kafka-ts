@@ -1,8 +1,9 @@
 import { TcpSocketConnectOpts } from 'net';
 import { TLSSocketOptions } from 'tls';
-import { API } from './api';
+import { API, API_ERROR } from './api';
+import { ApiVersionsResponse } from './api/api-versions';
 import { Connection, SendRequest } from './connection';
-import { ConnectionError } from './utils/error';
+import { ConnectionError, KafkaTSApiError } from './utils/error';
 import { shared } from './utils/shared';
 import { withTimeout } from './utils/timeout';
 
@@ -78,7 +79,16 @@ export class Broker {
     }
 
     private async fetchApiVersions() {
-        const { versions } = await this.sendConnectionRequest(API.API_VERSIONS, {});
+        const { versions } = await this.sendConnectionRequest(API.API_VERSIONS, {}).catch((error) => {
+            if (!(error instanceof KafkaTSApiError && error.errorCode === API_ERROR.UNSUPPORTED_VERSION)) throw error;
+
+            this.setVersions(error.response.versions);
+            return this.sendConnectionRequest(API.API_VERSIONS, {});
+        });
+        this.setVersions(versions);
+    }
+
+    private setVersions(versions: ApiVersionsResponse['versions']) {
         const versionsByApiKey = Object.fromEntries(
             versions.map(({ apiKey, minVersion, maxVersion }) => [apiKey, { minVersion, maxVersion }]),
         );

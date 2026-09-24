@@ -44,6 +44,7 @@ describe.sequential('Low-level API', () => {
 
     it('should request api versions', async () => {
         const result = await cluster.sendRequest(API.API_VERSIONS, {});
+        result.tags = {};
         expect(result).toMatchSnapshot();
     });
 
@@ -136,6 +137,7 @@ describe.sequential('Low-level API', () => {
             topicData: [
                 {
                     name: topicName,
+                    topicId,
                     partitionData: [
                         {
                             index: partitionIndex,
@@ -309,6 +311,7 @@ describe.sequential('Low-level API', () => {
             topics: [
                 {
                     name: topicName,
+                    topicId,
                     partitions: [
                         { partitionIndex: 0, committedOffset: 1n, committedLeaderEpoch: 0, committedMetadata: null },
                     ],
@@ -326,6 +329,7 @@ describe.sequential('Low-level API', () => {
                     topics: [
                         {
                             name: topicName,
+                            topicId,
                             partitionIndexes: [0],
                         },
                     ],

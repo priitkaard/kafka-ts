@@ -27,6 +27,10 @@ export class Decoder {
         return value;
     }
 
+    public peekInt16() {
+        return this.buffer.readInt16BE(this.offset);
+    }
+
     public readInt32() {
         const value = this.buffer.readInt32BE(this.offset);
         this.offset += 4;

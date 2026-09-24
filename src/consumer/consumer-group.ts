@@ -29,6 +29,7 @@ export class ConsumerGroup {
     private memberId = '';
     private generationId = -1;
     private leaderId = '';
+    private skipAssignment = false;
     private memberIds: string[] = [];
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private heartbeatError: KafkaTSError | null = null;
@@ -116,7 +117,11 @@ export class ConsumerGroup {
             this.memberId = response.memberId;
             this.generationId = response.generationId;
             this.leaderId = response.leader;
-            this.memberIds = response.members.map((member) => member.memberId);
+            this.skipAssignment = response.skipAssignment;
+            this.memberIds = response.members
+                .map(({ memberId, groupInstanceId }) => ({ memberId, sortKey: groupInstanceId ?? memberId }))
+                .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+                .map(({ memberId }) => memberId);
         });
     }
 
@@ -125,7 +130,7 @@ export class ConsumerGroup {
             const { cluster, metadata, groupId, groupInstanceId } = this.options;
 
             let assignments: MemberAssignment[] = [];
-            if (this.memberId === this.leaderId) {
+            if (this.memberId === this.leaderId && !this.skipAssignment) {
                 const memberAssignments = Object.entries(metadata.getTopicPartitions())
                     .flatMap(([topic, partitions]) => partitions.map((partition) => ({ topic, partition })))
                     .reduce(
@@ -169,7 +174,11 @@ export class ConsumerGroup {
                     {
                         groupId,
                         topics: topics
-                            .map((topic) => ({ name: topic, partitionIndexes: assignment[topic] ?? [] }))
+                            .map((topic) => ({
+                                name: topic,
+                                topicId: metadata.getTopicIdByName(topic),
+                                partitionIndexes: assignment[topic] ?? [],
+                            }))
                             .filter(({ partitionIndexes }) => partitionIndexes.length),
                     },
                 ].filter(({ topics }) => topics.length),
@@ -182,11 +191,12 @@ export class ConsumerGroup {
             const topicPartitions: Record<string, Set<number>> = {};
             response.groups.forEach((group) => {
                 group.topics.forEach((topic) => {
-                    topicPartitions[topic.name] ??= new Set();
+                    const topicName = 'name' in topic ? topic.name : metadata.getTopicNameById(topic.topicId);
+                    topicPartitions[topicName] ??= new Set();
                     topic.partitions.forEach(({ partitionIndex, committedOffset }) => {
                         if (committedOffset >= 0) {
-                            topicPartitions[topic.name].add(partitionIndex);
-                            offsetManager.resolve(topic.name, partitionIndex, committedOffset);
+                            topicPartitions[topicName].add(partitionIndex);
+                            offsetManager.resolve(topicName, partitionIndex, committedOffset);
                         }
                     });
                 });
@@ -197,7 +207,7 @@ export class ConsumerGroup {
 
     public async offsetCommit(topicPartitions: Record<string, Set<number>>): Promise<void> {
         return withRetry(this.handleError.bind(this))(async () => {
-            const { cluster, groupId, groupInstanceId, offsetManager, consumer } = this.options;
+            const { cluster, groupId, groupInstanceId, metadata, offsetManager, consumer } = this.options;
             const request = {
                 groupId,
                 groupInstanceId,
@@ -207,6 +217,7 @@ export class ConsumerGroup {
                     .filter(([topic]) => topic in offsetManager.pendingOffsets)
                     .map(([topic, partitions]) => ({
                         name: topic,
+                        topicId: metadata.getTopicIdByName(topic),
                         partitions: [...partitions]
                             .filter((partition) => partition in offsetManager.pendingOffsets[topic])
                             .map((partitionIndex) => ({
@@ -244,17 +255,14 @@ export class ConsumerGroup {
 
             const { cluster, groupId, groupInstanceId } = this.options;
             this.stopHeartbeater();
-            try {
-                await cluster.sendRequest(API.LEAVE_GROUP, {
-                    groupId,
-                    members: [{ memberId: this.memberId, groupInstanceId, reason: null }],
-                });
-            } catch (error) {
-                if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.FENCED_INSTANCE_ID) {
-                    return;
-                }
-                throw error;
+            if (groupInstanceId) {
+                return;
             }
+
+            await cluster.sendRequest(API.LEAVE_GROUP, {
+                groupId,
+                members: [{ memberId: this.memberId, groupInstanceId, reason: null }],
+            });
         });
     }
 

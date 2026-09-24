@@ -100,6 +100,22 @@ await kafka.startConsumer({
 });
 ```
 
+#### Static membership
+
+Setting `groupInstanceId` makes the consumer a static group member. A static member doesn't leave the group when it is closed, so it keeps its partitions for `sessionTimeoutMs`. A new consumer that starts with the same `groupInstanceId` within that time takes over the partitions without rebalancing the rest of the group, and a consumer still running with that id is fenced and closes itself. This allows replacing instances one by one (e.g. during a rolling deployment) without stalling the other consumers.
+
+Use a stable, unique `groupInstanceId` per instance (e.g. the pod name of a StatefulSet) and a `sessionTimeoutMs` longer than the time it takes to replace an instance. When an instance is removed for good, its partitions are reassigned after `sessionTimeoutMs`.
+
+```typescript
+const consumer = await kafka.startConsumer({
+    groupId: 'my-consumer-group',
+    groupInstanceId: process.env.HOSTNAME,
+    sessionTimeoutMs: 60_000,
+    topics: ['my-topic'],
+    onBatch: (messages) => console.log(messages),
+});
+```
+
 #### Partitioning
 
 By default, messages are partitioned by message key or round-robin if the key is null or undefined. Partition can be overwritten by `partition` property in the message. You can also override the default partitioner per producer instance `kafka.createProducer({ partitioner: customPartitioner })`.
@@ -161,7 +177,7 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 | ---------------------- | -------------------------------------- | -------- | ------------------------------- | ------------------------------------------------------------------------------------ |
 | topics                 | string[]                               | true     |                                 | List of topics to subscribe to                                                       |
 | groupId                | string                                 | false    | _null_                          | Consumer group id                                                                    |
-| groupInstanceId        | string                                 | false    | _null_                          | Consumer group instance id                                                           |
+| groupInstanceId        | string                                 | false    | _null_                          | Static group member id (see [Static membership](#static-membership))                 |
 | rackId                 | string                                 | false    | _null_                          | Rack id                                                                              |
 | isolationLevel         | IsolationLevel                         | false    | IsolationLevel.READ_UNCOMMITTED | Isolation level                                                                      |
 | sessionTimeoutMs       | number                                 | false    | 30000                           | Session timeout in milliseconds                                                      |

@@ -212,7 +212,7 @@ export class Connection {
         return api;
     }
 
-    private validateVersionCached = cached(this.validateVersion.bind(this), (api) => api.apiKey.toString());
+    private validateVersionCached = cached(this.validateVersion.bind(this), (api) => `${api.apiKey}:${api.apiVersion}`);
 
     @trace((api, body) => ({ message: getApiName(api), body }))
     public async sendRequest<Request, Response>(apiLatest: Api<Request, Response>, body: Request): Promise<Response> {
