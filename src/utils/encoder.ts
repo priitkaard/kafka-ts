@@ -44,6 +44,12 @@ export class Encoder {
         this.offset += 2;
         return this;
     }
+    public writeUInt16(value: number) {
+        this.ensure(2);
+        this.buffer.writeUInt16BE(value, this.offset);
+        this.offset += 2;
+        return this;
+    }
     public writeInt32(value: number) {
         this.ensure(4);
         this.buffer.writeInt32BE(value, this.offset);
@@ -59,6 +65,13 @@ export class Encoder {
     public writeInt64(value: bigint) {
         this.ensure(8);
         this.buffer.writeBigInt64BE(value, this.offset);
+        this.offset += 8;
+        return this;
+    }
+
+    public writeFloat64(value: number) {
+        this.ensure(8);
+        this.buffer.writeDoubleBE(value, this.offset);
         this.offset += 8;
         return this;
     }
@@ -139,6 +152,13 @@ export class Encoder {
     public writeVarIntArray<T>(arr: T[], callback: (encoder: Encoder, item: T) => void) {
         this.writeVarInt(arr.length);
         for (const it of arr) callback(this, it);
+        return this;
+    }
+
+    public writeNullableStruct<T>(value: T | null, callback: (encoder: Encoder, value: T) => void) {
+        if (value === null) return this.writeInt8(-1);
+        this.writeInt8(1);
+        callback(this, value);
         return this;
     }
 

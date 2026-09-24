@@ -2,42 +2,162 @@ import { Api } from '../utils/api';
 import { delay } from '../utils/delay';
 import { KafkaTSApiError } from '../utils/error';
 import { log } from '../utils/logger';
+import { ADD_OFFSETS_TO_TXN } from './add-offsets-to-txn';
+import { ADD_PARTITIONS_TO_TXN } from './add-partitions-to-txn';
+import { ADD_RAFT_VOTER } from './add-raft-voter';
+import { ALTER_CLIENT_QUOTAS } from './alter-client-quotas';
+import { ALTER_CONFIGS } from './alter-configs';
+import { ALTER_PARTITION_REASSIGNMENTS } from './alter-partition-reassignments';
+import { ALTER_REPLICA_LOG_DIRS } from './alter-replica-log-dirs';
+import { ALTER_SHARE_GROUP_OFFSETS } from './alter-share-group-offsets';
+import { ALTER_USER_SCRAM_CREDENTIALS } from './alter-user-scram-credentials';
 import { API_VERSIONS } from './api-versions';
+import { CONSUMER_GROUP_DESCRIBE } from './consumer-group-describe';
+import { CONSUMER_GROUP_HEARTBEAT } from './consumer-group-heartbeat';
+import { CREATE_ACLS } from './create-acls';
+import { CREATE_DELEGATION_TOKEN } from './create-delegation-token';
+import { CREATE_PARTITIONS } from './create-partitions';
 import { CREATE_TOPICS } from './create-topics';
+import { DELETE_ACLS } from './delete-acls';
+import { DELETE_GROUPS } from './delete-groups';
+import { DELETE_RECORDS } from './delete-records';
+import { DELETE_SHARE_GROUP_OFFSETS } from './delete-share-group-offsets';
+import { DELETE_SHARE_GROUP_STATE } from './delete-share-group-state';
 import { DELETE_TOPICS } from './delete-topics';
+import { DESCRIBE_ACLS } from './describe-acls';
+import { DESCRIBE_CLIENT_QUOTAS } from './describe-client-quotas';
+import { DESCRIBE_CLUSTER } from './describe-cluster';
+import { DESCRIBE_CONFIGS } from './describe-configs';
+import { DESCRIBE_DELEGATION_TOKEN } from './describe-delegation-token';
+import { DESCRIBE_GROUPS } from './describe-groups';
+import { DESCRIBE_LOG_DIRS } from './describe-log-dirs';
+import { DESCRIBE_PRODUCERS } from './describe-producers';
+import { DESCRIBE_QUORUM } from './describe-quorum';
+import { DESCRIBE_SHARE_GROUP_OFFSETS } from './describe-share-group-offsets';
+import { DESCRIBE_TOPIC_PARTITIONS } from './describe-topic-partitions';
+import { DESCRIBE_TRANSACTIONS } from './describe-transactions';
+import { DESCRIBE_USER_SCRAM_CREDENTIALS } from './describe-user-scram-credentials';
+import { ELECT_LEADERS } from './elect-leaders';
+import { END_TXN } from './end-txn';
+import { EXPIRE_DELEGATION_TOKEN } from './expire-delegation-token';
 import { FETCH } from './fetch';
 import { FIND_COORDINATOR } from './find-coordinator';
+import { GET_TELEMETRY_SUBSCRIPTIONS } from './get-telemetry-subscriptions';
 import { HEARTBEAT } from './heartbeat';
+import { INCREMENTAL_ALTER_CONFIGS } from './incremental-alter-configs';
 import { INIT_PRODUCER_ID } from './init-producer-id';
+import { INITIALIZE_SHARE_GROUP_STATE } from './initialize-share-group-state';
 import { JOIN_GROUP } from './join-group';
 import { LEAVE_GROUP } from './leave-group';
+import { LIST_CONFIG_RESOURCES } from './list-config-resources';
+import { LIST_GROUPS } from './list-groups';
 import { LIST_OFFSETS } from './list-offsets';
+import { LIST_PARTITION_REASSIGNMENTS } from './list-partition-reassignments';
+import { LIST_TRANSACTIONS } from './list-transactions';
 import { METADATA } from './metadata';
 import { OFFSET_COMMIT } from './offset-commit';
+import { OFFSET_DELETE } from './offset-delete';
 import { OFFSET_FETCH } from './offset-fetch';
+import { OFFSET_FOR_LEADER_EPOCH } from './offset-for-leader-epoch';
 import { PRODUCE } from './produce';
+import { PUSH_TELEMETRY } from './push-telemetry';
+import { READ_SHARE_GROUP_STATE } from './read-share-group-state';
+import { READ_SHARE_GROUP_STATE_SUMMARY } from './read-share-group-state-summary';
+import { REMOVE_RAFT_VOTER } from './remove-raft-voter';
+import { RENEW_DELEGATION_TOKEN } from './renew-delegation-token';
 import { SASL_AUTHENTICATE } from './sasl-authenticate';
 import { SASL_HANDSHAKE } from './sasl-handshake';
+import { SHARE_ACKNOWLEDGE } from './share-acknowledge';
+import { SHARE_FETCH } from './share-fetch';
+import { SHARE_GROUP_DESCRIBE } from './share-group-describe';
+import { SHARE_GROUP_HEARTBEAT } from './share-group-heartbeat';
+import { STREAMS_GROUP_DESCRIBE } from './streams-group-describe';
+import { STREAMS_GROUP_HEARTBEAT } from './streams-group-heartbeat';
 import { SYNC_GROUP } from './sync-group';
+import { TXN_OFFSET_COMMIT } from './txn-offset-commit';
+import { UNREGISTER_BROKER } from './unregister-broker';
+import { UPDATE_FEATURES } from './update-features';
+import { WRITE_SHARE_GROUP_STATE } from './write-share-group-state';
+import { WRITE_TXN_MARKERS } from './write-txn-markers';
 
 export const API = {
+    ADD_OFFSETS_TO_TXN,
+    ADD_PARTITIONS_TO_TXN,
+    ADD_RAFT_VOTER,
+    ALTER_CLIENT_QUOTAS,
+    ALTER_CONFIGS,
+    ALTER_PARTITION_REASSIGNMENTS,
+    ALTER_REPLICA_LOG_DIRS,
+    ALTER_SHARE_GROUP_OFFSETS,
+    ALTER_USER_SCRAM_CREDENTIALS,
     API_VERSIONS,
+    CONSUMER_GROUP_DESCRIBE,
+    CONSUMER_GROUP_HEARTBEAT,
+    CREATE_ACLS,
+    CREATE_DELEGATION_TOKEN,
+    CREATE_PARTITIONS,
     CREATE_TOPICS,
+    DELETE_ACLS,
+    DELETE_GROUPS,
+    DELETE_RECORDS,
+    DELETE_SHARE_GROUP_OFFSETS,
+    DELETE_SHARE_GROUP_STATE,
     DELETE_TOPICS,
+    DESCRIBE_ACLS,
+    DESCRIBE_CLIENT_QUOTAS,
+    DESCRIBE_CLUSTER,
+    DESCRIBE_CONFIGS,
+    DESCRIBE_DELEGATION_TOKEN,
+    DESCRIBE_GROUPS,
+    DESCRIBE_LOG_DIRS,
+    DESCRIBE_PRODUCERS,
+    DESCRIBE_QUORUM,
+    DESCRIBE_SHARE_GROUP_OFFSETS,
+    DESCRIBE_TOPIC_PARTITIONS,
+    DESCRIBE_TRANSACTIONS,
+    DESCRIBE_USER_SCRAM_CREDENTIALS,
+    ELECT_LEADERS,
+    END_TXN,
+    EXPIRE_DELEGATION_TOKEN,
     FETCH,
     FIND_COORDINATOR,
+    GET_TELEMETRY_SUBSCRIPTIONS,
     HEARTBEAT,
+    INCREMENTAL_ALTER_CONFIGS,
+    INITIALIZE_SHARE_GROUP_STATE,
     INIT_PRODUCER_ID,
     JOIN_GROUP,
     LEAVE_GROUP,
+    LIST_CONFIG_RESOURCES,
+    LIST_GROUPS,
     LIST_OFFSETS,
+    LIST_PARTITION_REASSIGNMENTS,
+    LIST_TRANSACTIONS,
     METADATA,
     OFFSET_COMMIT,
+    OFFSET_DELETE,
     OFFSET_FETCH,
+    OFFSET_FOR_LEADER_EPOCH,
     PRODUCE,
+    PUSH_TELEMETRY,
+    READ_SHARE_GROUP_STATE,
+    READ_SHARE_GROUP_STATE_SUMMARY,
+    REMOVE_RAFT_VOTER,
+    RENEW_DELEGATION_TOKEN,
     SASL_AUTHENTICATE,
     SASL_HANDSHAKE,
+    SHARE_ACKNOWLEDGE,
+    SHARE_FETCH,
+    SHARE_GROUP_DESCRIBE,
+    SHARE_GROUP_HEARTBEAT,
+    STREAMS_GROUP_DESCRIBE,
+    STREAMS_GROUP_HEARTBEAT,
     SYNC_GROUP,
+    TXN_OFFSET_COMMIT,
+    UNREGISTER_BROKER,
+    UPDATE_FEATURES,
+    WRITE_SHARE_GROUP_STATE,
+    WRITE_TXN_MARKERS,
 };
 
 const apiNameByKey = Object.fromEntries(Object.entries(API).map(([k, v]) => [v.apiKey, k]));

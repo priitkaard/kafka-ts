@@ -31,6 +31,12 @@ export class Decoder {
         return this.buffer.readInt16BE(this.offset);
     }
 
+    public readUInt16() {
+        const value = this.buffer.readUInt16BE(this.offset);
+        this.offset += 2;
+        return value;
+    }
+
     public readInt32() {
         const value = this.buffer.readInt32BE(this.offset);
         this.offset += 4;
@@ -45,6 +51,12 @@ export class Decoder {
 
     public readInt64() {
         const value = this.buffer.readBigInt64BE(this.offset);
+        this.offset += 8;
+        return value;
+    }
+
+    public readFloat64() {
+        const value = this.buffer.readDoubleBE(this.offset);
         this.offset += 8;
         return value;
     }
@@ -147,6 +159,14 @@ export class Decoder {
         const results = new Array<T>(Math.max(length, 0));
         for (let i = 0; i < length; i++) results[i] = callback(this);
         return results;
+    }
+
+    public readStruct<T>(callback: (decoder: Decoder) => T): T {
+        return callback(this);
+    }
+
+    public readNullableStruct<T>(callback: (decoder: Decoder) => T): T | null {
+        return this.readInt8() < 0 ? null : callback(this);
     }
 
     public readRecords<T>(callback: (opts: Decoder) => T): T[] {

@@ -2,7 +2,9 @@
 
 **KafkaTS** is a Apache Kafka client library for Node.js. It provides both a low-level API for communicating directly with the Apache Kafka cluster and high-level APIs for publishing and subscribing to Kafka topics.
 
-**Supported Kafka versions:** ^3.6.x, ^4.0.0
+**Tested Kafka versions:** 3.7.2, 3.8.1, 3.9.1, 4.0.1, 4.1.1, 4.2.0, 4.3.0
+
+Every request is sent with the highest protocol version supported by both KafkaTS and the broker, so older and newer brokers work as long as they support the oldest API versions listed in the [Kafka protocol specification](https://kafka.apache.org/protocol). See [Supported APIs](#supported-apis).
 
 ## Installation
 
@@ -222,3 +224,87 @@ Retries resend the same batch with the same producer id and sequence, so the bro
 | key       | Buffer \| null         | false    | _null_  | Message key                                                                                                                |
 | value     | Buffer \| null         | true     |         | Message value                                                                                                              |
 | headers   | Record<string, string> | false    | _null_  | Message headers                                                                                                            |
+
+## Supported APIs
+
+All client-facing APIs of the [Kafka protocol](https://kafka.apache.org/protocol) are implemented in every version listed in the protocol specification, and are available through the low-level API (`cluster.sendRequest(API.<CONSTANT>, request)`). Each request uses the highest version supported by both KafkaTS and the broker.
+
+| Key | API                          | Constant                              | Versions | Supported |
+| --- | ---------------------------- | ------------------------------------- | -------- | :-------: |
+| 0   | Produce                      | `API.PRODUCE`                         | 3–13     |    ✅     |
+| 1   | Fetch                        | `API.FETCH`                           | 4–18     |    ✅     |
+| 2   | ListOffsets                  | `API.LIST_OFFSETS`                    | 1–11     |    ✅     |
+| 3   | Metadata                     | `API.METADATA`                        | 0–13     |    ✅     |
+| 8   | OffsetCommit                 | `API.OFFSET_COMMIT`                   | 2–10     |    ✅     |
+| 9   | OffsetFetch                  | `API.OFFSET_FETCH`                    | 1–10     |    ✅     |
+| 10  | FindCoordinator              | `API.FIND_COORDINATOR`                | 0–6      |    ✅     |
+| 11  | JoinGroup                    | `API.JOIN_GROUP`                      | 0–9      |    ✅     |
+| 12  | Heartbeat                    | `API.HEARTBEAT`                       | 0–4      |    ✅     |
+| 13  | LeaveGroup                   | `API.LEAVE_GROUP`                     | 0–5      |    ✅     |
+| 14  | SyncGroup                    | `API.SYNC_GROUP`                      | 0–5      |    ✅     |
+| 15  | DescribeGroups               | `API.DESCRIBE_GROUPS`                 | 0–6      |    ✅     |
+| 16  | ListGroups                   | `API.LIST_GROUPS`                     | 0–5      |    ✅     |
+| 17  | SaslHandshake                | `API.SASL_HANDSHAKE`                  | 0–1      |    ✅     |
+| 18  | ApiVersions                  | `API.API_VERSIONS`                    | 0–4      |    ✅     |
+| 19  | CreateTopics                 | `API.CREATE_TOPICS`                   | 2–7      |    ✅     |
+| 20  | DeleteTopics                 | `API.DELETE_TOPICS`                   | 1–6      |    ✅     |
+| 21  | DeleteRecords                | `API.DELETE_RECORDS`                  | 0–2      |    ✅     |
+| 22  | InitProducerId               | `API.INIT_PRODUCER_ID`                | 0–6      |    ✅     |
+| 23  | OffsetForLeaderEpoch         | `API.OFFSET_FOR_LEADER_EPOCH`         | 2–4      |    ✅     |
+| 24  | AddPartitionsToTxn           | `API.ADD_PARTITIONS_TO_TXN`           | 0–5      |    ✅     |
+| 25  | AddOffsetsToTxn              | `API.ADD_OFFSETS_TO_TXN`              | 0–4      |    ✅     |
+| 26  | EndTxn                       | `API.END_TXN`                         | 0–5      |    ✅     |
+| 27  | WriteTxnMarkers              | `API.WRITE_TXN_MARKERS`               | 1–2      |    ✅     |
+| 28  | TxnOffsetCommit              | `API.TXN_OFFSET_COMMIT`               | 0–5      |    ✅     |
+| 29  | DescribeAcls                 | `API.DESCRIBE_ACLS`                   | 1–3      |    ✅     |
+| 30  | CreateAcls                   | `API.CREATE_ACLS`                     | 1–3      |    ✅     |
+| 31  | DeleteAcls                   | `API.DELETE_ACLS`                     | 1–3      |    ✅     |
+| 32  | DescribeConfigs              | `API.DESCRIBE_CONFIGS`                | 1–4      |    ✅     |
+| 33  | AlterConfigs                 | `API.ALTER_CONFIGS`                   | 0–2      |    ✅     |
+| 34  | AlterReplicaLogDirs          | `API.ALTER_REPLICA_LOG_DIRS`          | 1–2      |    ✅     |
+| 35  | DescribeLogDirs              | `API.DESCRIBE_LOG_DIRS`               | 1–5      |    ✅     |
+| 36  | SaslAuthenticate             | `API.SASL_AUTHENTICATE`               | 0–2      |    ✅     |
+| 37  | CreatePartitions             | `API.CREATE_PARTITIONS`               | 0–3      |    ✅     |
+| 38  | CreateDelegationToken        | `API.CREATE_DELEGATION_TOKEN`         | 1–3      |    ✅     |
+| 39  | RenewDelegationToken         | `API.RENEW_DELEGATION_TOKEN`          | 1–2      |    ✅     |
+| 40  | ExpireDelegationToken        | `API.EXPIRE_DELEGATION_TOKEN`         | 1–2      |    ✅     |
+| 41  | DescribeDelegationToken      | `API.DESCRIBE_DELEGATION_TOKEN`       | 1–3      |    ✅     |
+| 42  | DeleteGroups                 | `API.DELETE_GROUPS`                   | 0–2      |    ✅     |
+| 43  | ElectLeaders                 | `API.ELECT_LEADERS`                   | 0–2      |    ✅     |
+| 44  | IncrementalAlterConfigs      | `API.INCREMENTAL_ALTER_CONFIGS`       | 0–1      |    ✅     |
+| 45  | AlterPartitionReassignments  | `API.ALTER_PARTITION_REASSIGNMENTS`   | 0–1      |    ✅     |
+| 46  | ListPartitionReassignments   | `API.LIST_PARTITION_REASSIGNMENTS`    | 0        |    ✅     |
+| 47  | OffsetDelete                 | `API.OFFSET_DELETE`                   | 0        |    ✅     |
+| 48  | DescribeClientQuotas         | `API.DESCRIBE_CLIENT_QUOTAS`          | 0–1      |    ✅     |
+| 49  | AlterClientQuotas            | `API.ALTER_CLIENT_QUOTAS`             | 0–1      |    ✅     |
+| 50  | DescribeUserScramCredentials | `API.DESCRIBE_USER_SCRAM_CREDENTIALS` | 0        |    ✅     |
+| 51  | AlterUserScramCredentials    | `API.ALTER_USER_SCRAM_CREDENTIALS`    | 0        |    ✅     |
+| 55  | DescribeQuorum               | `API.DESCRIBE_QUORUM`                 | 0–2      |    ✅     |
+| 57  | UpdateFeatures               | `API.UPDATE_FEATURES`                 | 0–2      |    ✅     |
+| 60  | DescribeCluster              | `API.DESCRIBE_CLUSTER`                | 0–2      |    ✅     |
+| 61  | DescribeProducers            | `API.DESCRIBE_PRODUCERS`              | 0        |    ✅     |
+| 64  | UnregisterBroker             | `API.UNREGISTER_BROKER`               | 0        |    ✅     |
+| 65  | DescribeTransactions         | `API.DESCRIBE_TRANSACTIONS`           | 0        |    ✅     |
+| 66  | ListTransactions             | `API.LIST_TRANSACTIONS`               | 0–2      |    ✅     |
+| 68  | ConsumerGroupHeartbeat       | `API.CONSUMER_GROUP_HEARTBEAT`        | 0–1      |    ✅     |
+| 69  | ConsumerGroupDescribe        | `API.CONSUMER_GROUP_DESCRIBE`         | 0–1      |    ✅     |
+| 71  | GetTelemetrySubscriptions    | `API.GET_TELEMETRY_SUBSCRIPTIONS`     | 0        |    ✅     |
+| 72  | PushTelemetry                | `API.PUSH_TELEMETRY`                  | 0        |    ✅     |
+| 74  | ListConfigResources          | `API.LIST_CONFIG_RESOURCES`           | 0–1      |    ✅     |
+| 75  | DescribeTopicPartitions      | `API.DESCRIBE_TOPIC_PARTITIONS`       | 0        |    ✅     |
+| 76  | ShareGroupHeartbeat          | `API.SHARE_GROUP_HEARTBEAT`           | 1        |    ✅     |
+| 77  | ShareGroupDescribe           | `API.SHARE_GROUP_DESCRIBE`            | 1        |    ✅     |
+| 78  | ShareFetch                   | `API.SHARE_FETCH`                     | 1–2      |    ✅     |
+| 79  | ShareAcknowledge             | `API.SHARE_ACKNOWLEDGE`               | 1–2      |    ✅     |
+| 80  | AddRaftVoter                 | `API.ADD_RAFT_VOTER`                  | 0–1      |    ✅     |
+| 81  | RemoveRaftVoter              | `API.REMOVE_RAFT_VOTER`               | 0        |    ✅     |
+| 83  | InitializeShareGroupState    | `API.INITIALIZE_SHARE_GROUP_STATE`    | 0        |    ✅     |
+| 84  | ReadShareGroupState          | `API.READ_SHARE_GROUP_STATE`          | 0        |    ✅     |
+| 85  | WriteShareGroupState         | `API.WRITE_SHARE_GROUP_STATE`         | 0–1      |    ✅     |
+| 86  | DeleteShareGroupState        | `API.DELETE_SHARE_GROUP_STATE`        | 0        |    ✅     |
+| 87  | ReadShareGroupStateSummary   | `API.READ_SHARE_GROUP_STATE_SUMMARY`  | 0–1      |    ✅     |
+| 88  | StreamsGroupHeartbeat        | `API.STREAMS_GROUP_HEARTBEAT`         | 0        |    ✅     |
+| 89  | StreamsGroupDescribe         | `API.STREAMS_GROUP_DESCRIBE`          | 0        |    ✅     |
+| 90  | DescribeShareGroupOffsets    | `API.DESCRIBE_SHARE_GROUP_OFFSETS`    | 0–1      |    ✅     |
+| 91  | AlterShareGroupOffsets       | `API.ALTER_SHARE_GROUP_OFFSETS`       | 0        |    ✅     |
+| 92  | DeleteShareGroupOffsets      | `API.DELETE_SHARE_GROUP_OFFSETS`      | 0        |    ✅     |

@@ -261,18 +261,19 @@ export class Connection {
             clearTimeout(timeout);
         }
         const { responseDecoder, responseSize } = rawResponse;
-
-        try {
-            const response = await api.response(responseDecoder);
-
+        const assertConsumed = () =>
             assert(
                 responseDecoder.getOffset() === responseSize,
                 `Buffer not correctly consumed: ${responseDecoder.getOffset()} !== ${responseSize}`,
             );
 
+        try {
+            const response = await api.response(responseDecoder);
+            assertConsumed();
             return response;
         } catch (error) {
             if (error instanceof KafkaTSApiError) {
+                assertConsumed();
                 error.apiName = apiName;
                 error.request = body;
             }
