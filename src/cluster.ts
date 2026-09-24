@@ -155,20 +155,18 @@ export class Cluster {
     private async findSeedBroker() {
         const randomizedBrokers = this.options.bootstrapServers.toSorted(() => Math.random() - 0.5);
         for (const options of randomizedBrokers) {
-            const broker = new Broker({
-                clientId: this.options.clientId,
-                sasl: this.options.sasl,
-                ssl: this.options.ssl,
-                requestTimeout: this.options.requestTimeout,
-                connectTimeout: this.options.connectTimeout,
-                options,
-            });
             try {
+                const broker = new Broker({
+                    clientId: this.options.clientId,
+                    sasl: this.options.sasl,
+                    ssl: this.options.ssl,
+                    requestTimeout: this.options.requestTimeout,
+                    connectTimeout: this.options.connectTimeout,
+                    options,
+                });
                 await broker.connect();
                 return broker;
             } catch (error) {
-                await this.safeDisconnect(broker);
-
                 log.warn(`Failed to connect to seed broker ${options.host}:${options.port}`, {
                     reason: (error as Error).message,
                 });
