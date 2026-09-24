@@ -97,8 +97,7 @@ const OFFSET_FETCH_V6 = createApi<OffsetFetchRequest, OffsetFetchResponse>({
             ],
             tags: decoder.readTagBuffer(),
         };
-        if (result.groups[0].errorCode)
-            throw new KafkaTSApiError(result.groups[0].errorCode, null, result);
+        if (result.groups[0].errorCode) throw new KafkaTSApiError(result.groups[0].errorCode, null, result);
         result.groups[0].topics.forEach((topic) => {
             topic.partitions.forEach((partition) => {
                 if (partition.errorCode) throw new KafkaTSApiError(partition.errorCode, null, result);

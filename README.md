@@ -104,6 +104,8 @@ await kafka.startConsumer({
 
 By default, messages are partitioned by message key or round-robin if the key is null or undefined. Partition can be overwritten by `partition` property in the message. You can also override the default partitioner per producer instance `kafka.createProducer({ partitioner: customPartitioner })`.
 
+**Keyed messages change partition in 1.4.0.** The default partitioner's murmur2 lost precision on the 32-bit multiplications before 1.4.0, so it disagreed with the Java client for most keys. It is now byte-for-byte identical, which means a key can hash to a different partition than it did in 1.3.3 - about 8 in 10 keys move on a 6-partition topic. Both partitioners are live during a rolling upgrade, so per-key ordering is not preserved across it, and keys written before the upgrade stay co-partitioned by the old assignment. If either matters, drain the topic before upgrading, or keep the old assignment by copying the 1.3.3 `murmur2` into a custom `partitioner`.
+
 A simple example how to partition messages by the value in message header `x-partition-key`:
 
 ```typescript
@@ -142,6 +144,7 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 | sasl             | SASLProvider           | false    |         | SASL provider                                        |
 | ssl              | TLSSocketOptions       | false    |         | SSL configuration.                                   |
 | requestTimeout   | number                 | false    | 60000   | Request timeout in milliseconds.                     |
+| connectTimeout   | number                 | false    | 10000   | Connect and handshake timeout in milliseconds.       |
 
 #### Supported SASL mechanisms
 
@@ -163,7 +166,7 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 | isolationLevel         | IsolationLevel                         | false    | IsolationLevel.READ_UNCOMMITTED | Isolation level                                                                      |
 | sessionTimeoutMs       | number                                 | false    | 30000                           | Session timeout in milliseconds                                                      |
 | rebalanceTimeoutMs     | number                                 | false    | 60000                           | Rebalance timeout in milliseconds                                                    |
-| maxWaitMs              | number                                 | false    | 5000                            | Fetch long poll timeout in milliseconds                                              |
+| maxWaitMs              | number                                 | false    | 5000                            | Fetch long poll timeout in milliseconds. Must be lower than `requestTimeout`.        |
 | minBytes               | number                                 | false    | 1                               | Minimum number of bytes to wait for before returning a fetch response                |
 | maxBytes               | number                                 | false    | 1_048_576                       | Maximum number of bytes to return in the fetch response                              |
 | partitionMaxBytes      | number                                 | false    | 1_048_576                       | Maximum number of bytes to return per partition in the fetch response                |
@@ -177,6 +180,12 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 | ---------------------- | ----------- | -------- | ------------------ | --------------------------------------------------------------------------------------- |
 | allowTopicAutoCreation | boolean     | false    | false              | Allow kafka to auto-create topic when it doesn't exist                                  |
 | partitioner            | Partitioner | false    | defaultPartitioner | Custom partitioner function. By default, it uses a default java-compatible partitioner. |
+| maxBatchSize           | number      | false    | 500                | Maximum number of messages from separate `send()` calls batched into one request.       |
+| maxRetries             | number      | false    | 5                  | Maximum number of retries per `send()` after a recoverable error.                       |
+| retryDelayMs           | number      | false    | 100                | Delay before the first retry in milliseconds. Doubled on every subsequent attempt.      |
+| maxRetryDelayMs        | number      | false    | 3000               | Upper bound for the exponential retry delay in milliseconds.                            |
+
+Retries resend the same batch with the same producer id and sequence, so the broker discards duplicates. A message may be written twice only if `send()` rejects and is called again.
 
 ### `producer.send(messages: Message[])`
 

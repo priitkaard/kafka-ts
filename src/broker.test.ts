@@ -1,5 +1,6 @@
 import net, { AddressInfo, Server, Socket } from 'net';
 import { afterEach, describe, expect, it } from 'vitest';
+import { API } from './api';
 import { Broker } from './broker';
 
 describe('Broker', () => {
@@ -61,5 +62,30 @@ describe('Broker', () => {
         await new Promise((resolve) => setTimeout(resolve, 200));
 
         expect(closed).toEqual([true]);
+    });
+
+    it('handshakes once and rejects requests until the handshake completes', async () => {
+        let requestCount = 0;
+        const port = await startServer((socket) =>
+            socket.on('data', (data: Buffer) => {
+                for (let offset = 0; offset < data.length; offset += 4 + data.readInt32BE(offset)) requestCount++;
+            }),
+        );
+
+        const broker = new Broker({
+            clientId: 'kafka-ts-test',
+            options: { host: '127.0.0.1', port },
+            sasl: null,
+            ssl: null,
+            requestTimeout: 60_000,
+            connectTimeout: 300,
+        });
+
+        const connecting = Promise.all([broker.connect(), broker.connect()]);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        await expect(broker.sendRequest(API.METADATA, { topics: [] })).rejects.toThrow(/Not connected/);
+        await expect(connecting).rejects.toThrow(/timed out/);
+        expect(requestCount).toBe(1);
     });
 });

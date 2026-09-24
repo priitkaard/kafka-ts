@@ -45,7 +45,7 @@ export class OffsetManager {
         Object.entries(topicPartitions).forEach(([topic, partitions]) => {
             this.currentOffsets[topic] ??= {};
             partitions.forEach((partition) => {
-                if (this.pendingOffsets[topic]?.[partition]) {
+                if (this.pendingOffsets[topic]?.[partition] !== undefined) {
                     this.currentOffsets[topic][partition] = this.pendingOffsets[topic][partition];
                     delete this.pendingOffsets[topic][partition];
                 }

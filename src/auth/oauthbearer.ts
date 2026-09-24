@@ -7,6 +7,8 @@ import { exponentialBackoff, withRetry } from '../utils/retry';
 
 const MAX_INT = Math.pow(2, 31) - 1;
 const RETRY_DELAY_MS = 1_000;
+const MAX_RETRY_DELAY_MS = 30_000;
+const DEFAULT_EXPIRES_IN_SECONDS = 3_600;
 
 export const oAuthBearer = (getToken: () => Promise<{ access_token: string }>): SASLProvider => {
     return {
@@ -46,28 +48,52 @@ export const oAuthAuthenticator = ({
         );
 
     let tokenPromise = requestToken();
+    let refreshToken: string | undefined;
+    let validUntil = 0;
+    let consecutiveFailures = 0;
 
-    const scheduleRefresh = async () => {
-        let token: TokenResponse | undefined;
-        try {
-            token = await tokenPromise;
-        } catch (error) {
-            log.warn('Failed to obtain OAuth token. Retrying...', { reason: getErrorMessage(error) });
-        }
+    const getRetryDelayMs = () => Math.min(RETRY_DELAY_MS * 2 ** consecutiveFailures++, MAX_RETRY_DELAY_MS);
 
-        const refreshInMs = token
-            ? clamp((token.expires_in - refreshThresholdSeconds) * 1000, 1, MAX_INT)
-            : RETRY_DELAY_MS;
+    const scheduleRefresh = (delayMs: number) => setTimeout(() => void refresh(), delayMs).unref();
 
-        const timeout = setTimeout(() => {
-            tokenPromise = requestToken(token?.refresh_token);
-            scheduleRefresh();
-        }, refreshInMs);
-        timeout.unref?.();
+    const accept = (token: TokenResponse) => {
+        const lifetimeSeconds = Math.max(Number(token.expires_in), 0) || DEFAULT_EXPIRES_IN_SECONDS;
+        consecutiveFailures = 0;
+
+        refreshToken = token.refresh_token;
+        validUntil = Date.now() + lifetimeSeconds * 1000;
+        scheduleRefresh(getRefreshInMs(lifetimeSeconds, refreshThresholdSeconds));
     };
-    scheduleRefresh();
+
+    const refresh = async () => {
+        const pending = requestToken(refreshToken);
+        if (Date.now() >= validUntil) tokenPromise = pending;
+
+        try {
+            const token = await pending;
+            tokenPromise = pending;
+            accept(token);
+        } catch (error) {
+            log.warn('Failed to refresh the OAuth token. Retrying...', { reason: getErrorMessage(error) });
+
+            refreshToken = undefined;
+            scheduleRefresh(getRetryDelayMs());
+        }
+    };
+
+    tokenPromise.then(accept, (error) => {
+        log.warn('Failed to obtain OAuth token. Retrying...', { reason: getErrorMessage(error) });
+        scheduleRefresh(getRetryDelayMs());
+    });
 
     return () => tokenPromise;
+};
+
+const getRefreshInMs = (lifetimeSeconds: number, refreshThresholdSeconds: number) => {
+    const aheadOfExpiry = lifetimeSeconds - refreshThresholdSeconds;
+    const refreshInSeconds = aheadOfExpiry > 0 ? aheadOfExpiry : lifetimeSeconds / 2;
+
+    return clamp(refreshInSeconds * 1000, RETRY_DELAY_MS, MAX_INT);
 };
 
 type TokenRequest = {

@@ -7,7 +7,7 @@ import { groupByLeaderId } from '../distributors/group-by-leader-id';
 import { groupPartitionsByTopic } from '../distributors/group-partitions-by-topic';
 import { Message } from '../types';
 import { delay } from '../utils/delay';
-import { ConnectionError, KafkaTSApiError } from '../utils/error';
+import { ConnectionError, getErrorMessage, KafkaTSApiError } from '../utils/error';
 import { log } from '../utils/logger';
 import { defaultRetrier, Retrier } from '../utils/retrier';
 import { withRetry } from '../utils/retry';
@@ -50,7 +50,10 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
     private consumerGroup: ConsumerGroup | undefined;
     private offsetManager: OffsetManager;
     private fetchManager?: FetchManager;
-    private stopHook: (() => void) | undefined;
+    private stopRequested = false;
+    private stopHooks: (() => void)[] = [];
+    private running = false;
+    private closed = false;
 
     constructor(
         private cluster: Cluster,
@@ -101,32 +104,69 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
 
     @trace()
     public async start(): Promise<void> {
-        this.stopHook = undefined;
+        this.closed = false;
 
-        try {
-            await this.cluster.connect();
-            await this.fetchMetadata();
-            this.metadata.setAssignment(this.metadata.getTopicPartitions());
-            await this.fetchOffsets();
-            await this.consumerGroup?.init();
-        } catch (error) {
-            log.error('Failed to start consumer', error);
-            log.debug(`Restarting consumer in 1 second...`);
-            await delay(1000);
+        return this.resume();
+    }
 
-            if (this.stopHook) return (this.stopHook as () => void)();
-            return this.close(true).then(() => this.start());
+    private async resume(): Promise<void> {
+        this.stopRequested = false;
+        this.running = true;
+
+        while (true) {
+            try {
+                await this.cluster.connect();
+                await this.fetchMetadata();
+                this.metadata.setAssignment(this.metadata.getTopicPartitions());
+                await this.fetchOffsets();
+                await this.consumerGroup?.init();
+                break;
+            } catch (error) {
+                log.error('Failed to start consumer', error);
+                log.debug(`Restarting consumer in 1 second...`);
+                await delay(1000);
+
+                if (this.stopRequested) return this.stopRunning();
+                await this.shutdown(false);
+                if (this.stopRequested) return this.stopRunning();
+            }
         }
+        if (this.stopRequested) return this.stopRunning();
+
         this.startFetchManager();
+    }
+
+    private stopRunning() {
+        this.running = false;
+
+        const hooks = this.stopHooks;
+        this.stopHooks = [];
+        hooks.forEach((hook) => hook());
     }
 
     @trace()
     public async close(force = false): Promise<void> {
-        if (!force) {
-            await new Promise<void>(async (resolve) => {
-                this.stopHook = resolve;
-                await this.fetchManager?.stop();
-            });
+        this.closed = true;
+        this.stopRequested = true;
+
+        await this.shutdown(!force);
+    }
+
+    private async restart() {
+        await this.shutdown(true);
+
+        if (this.closed) return;
+
+        await this.resume();
+    }
+
+    private async shutdown(drain: boolean) {
+        if (drain && this.running) {
+            const drained = new Promise<void>((resolve) => this.stopHooks.push(resolve));
+            this.stopRequested = true;
+
+            await this.fetchManager?.stop();
+            await drained;
         }
         await this.consumerGroup
             ?.leaveGroup()
@@ -135,11 +175,23 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
     }
 
     private async startFetchManager() {
+        try {
+            await this.runFetchManager();
+        } catch (error) {
+            log.error('Consumer stopped unexpectedly', error);
+            void this.restart();
+        } finally {
+            this.stopRunning();
+        }
+    }
+
+    private async runFetchManager() {
         const { groupId } = this.options;
 
-        while (!this.stopHook) {
+        while (!this.stopRequested) {
             try {
                 await this.consumerGroup?.join();
+                if (this.stopRequested) break;
 
                 // TODO: If leader is not available, find another read replica
 
@@ -186,7 +238,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                 }
                 if (error instanceof ConnectionError) {
                     log.debug(`${error.message}. Restarting consumer...`, { stack: error.stack });
-                    this.close().then(() => this.start());
+                    void this.restart();
                     break;
                 }
                 log.error((error as Error).message, error);
@@ -194,18 +246,17 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                 log.debug(`Restarting consumer in 1 second...`);
                 await delay(1000);
 
-                this.close().then(() => this.start());
+                void this.restart();
                 break;
             }
         }
-        this.stopHook?.();
     }
 
     private async waitForReassignment() {
         const { groupId } = this.options;
 
         log.debug('No partitions assigned. Waiting for reassignment...', { groupId });
-        while (!this.stopHook) {
+        while (!this.stopRequested) {
             await delay(1000);
             this.consumerGroup?.handleLastHeartbeat();
         }
@@ -227,17 +278,15 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
             return response.partitions.flatMap(({ partitionIndex, records }) => {
                 topicPartitions[topic].add(partitionIndex);
                 return records.flatMap(({ baseTimestamp, baseOffset, records }) =>
-                    records.flatMap(
-                        (message): Required<Message> => ({
-                            topic,
-                            partition: partitionIndex,
-                            key: message.key ?? null,
-                            value: message.value ?? null,
-                            headers: Object.fromEntries(message.headers.map(({ key, value }) => [key, value])),
-                            timestamp: baseTimestamp + BigInt(message.timestampDelta),
-                            offset: baseOffset + BigInt(message.offsetDelta),
-                        }),
-                    ),
+                    records.flatMap((message): Required<Message> => ({
+                        topic,
+                        partition: partitionIndex,
+                        key: message.key ?? null,
+                        value: message.value ?? null,
+                        headers: Object.fromEntries(message.headers.map(({ key, value }) => [key, value])),
+                        timestamp: baseTimestamp + BigInt(message.timestampDelta),
+                        offset: baseOffset + BigInt(message.offsetDelta),
+                    })),
                 );
             });
         });
@@ -245,8 +294,13 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
             return;
         }
 
-        const commitOffset = () =>
-            this.consumerGroup?.offsetCommit(topicPartitions).then(() => this.offsetManager.flush(topicPartitions));
+        const commitOffset = async () => {
+            await this.consumerGroup?.offsetCommit(topicPartitions);
+            this.offsetManager.flush(topicPartitions);
+        };
+
+        const commitOffsetSafely = () =>
+            commitOffset().catch((error) => log.debug('Failed to commit offsets', { reason: getErrorMessage(error) }));
 
         const resolveOffset = (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) =>
             this.offsetManager.resolve(message.topic, message.partition, message.offset + 1n);
@@ -254,7 +308,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
         const abortController = new AbortController();
         const onRebalance = () => {
             abortController.abort();
-            commitOffset()?.catch();
+            void commitOffsetSafely();
         };
         this.once('rebalanceInProgress', onRebalance);
 
@@ -266,7 +320,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                 ),
             );
         } catch (error) {
-            await commitOffset()?.catch();
+            await commitOffsetSafely();
             throw error;
         } finally {
             this.off('rebalanceInProgress', onRebalance);

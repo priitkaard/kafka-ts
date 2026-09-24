@@ -1,16 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Cluster } from '../cluster';
+import { Metadata } from '../metadata';
 import { Message } from '../types';
+import { PromiseChain } from '../utils/promise-chain';
 import { ProducerBuffer } from './producer-buffer';
 import { ProducerState } from './producer-state';
 
-const createBuffer = (sendRequest: () => Promise<unknown>) => {
-    const cluster = { sendRequestToNode: () => sendRequest } as unknown as Cluster;
+const metadata = { getTopicPartitionLeaderIds: () => ({ topic: { 0: 1 } }) } as unknown as Metadata;
+
+const giveUp = async (error: unknown) => {
+    throw error;
+};
+
+const createBuffer = (sendRequest: () => Promise<unknown>, initProducerId = vi.fn()) => {
+    initProducerId.mockResolvedValue({ producerId: 1n, producerEpoch: 0 });
+    const cluster = { sendRequest: initProducerId, sendRequestToNode: () => sendRequest } as unknown as Cluster;
     return new ProducerBuffer({
-        nodeId: 1,
         maxBatchSize: 500,
         cluster,
+        metadata,
         state: new ProducerState({ cluster }),
+        partitionLocks: new PromiseChain(),
+        retry: giveUp,
     });
 };
 
@@ -32,14 +43,43 @@ describe('ProducerBuffer', () => {
         await expect(buffer.enqueue(createMessages(300_000))).resolves.toBeUndefined();
     });
 
-    it('rejects pending enqueues and stays usable when flushing throws unexpectedly', async () => {
-        const buffer = createBuffer(() => Promise.resolve({}));
+    it('requests a new producer id after a failed send', async () => {
+        const initProducerId = vi.fn();
+        const sendRequest = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValue({});
+        const buffer = createBuffer(sendRequest, initProducerId);
 
-        vi.spyOn(buffer as any, 'compactBuffer').mockImplementationOnce(() => {
-            throw new Error('internal');
-        });
+        await expect(buffer.enqueue(createMessages(1))).rejects.toThrow('boom');
+        await buffer.enqueue(createMessages(1));
 
-        await expect(buffer.enqueue(createMessages(1))).rejects.toThrow('internal');
-        await expect(buffer.enqueue(createMessages(1))).resolves.toBeUndefined();
+        expect(initProducerId).toHaveBeenCalledTimes(2);
+    });
+
+    it('sends one batch at a time per partition across buffers', async () => {
+        let inFlight = 0;
+        let maxInFlight = 0;
+        const sendRequest = async () => {
+            maxInFlight = Math.max(maxInFlight, ++inFlight);
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            inFlight--;
+            return {};
+        };
+        const cluster = {
+            sendRequest: async () => ({ producerId: 1n, producerEpoch: 0 }),
+            sendRequestToNode: () => sendRequest,
+        } as unknown as Cluster;
+        const options = {
+            maxBatchSize: 500,
+            cluster,
+            metadata,
+            state: new ProducerState({ cluster }),
+            partitionLocks: new PromiseChain(),
+            retry: giveUp,
+        };
+        const first = new ProducerBuffer(options);
+        const second = new ProducerBuffer(options);
+
+        await Promise.all([first.enqueue(createMessages(1)), second.enqueue(createMessages(1))]);
+
+        expect(maxInFlight).toBe(1);
     });
 });

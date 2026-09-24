@@ -3,13 +3,10 @@ export const shared = <F extends (...args: any[]) => Promise<any>>(func: F) => {
     return (...args: Parameters<F>): ReturnType<F> => {
         const key = JSON.stringify(args);
         if (!promises[key]) {
-            const promise = (async () => func(...args))();
-            promises[key] = promise;
+            promises[key] = func(...args);
 
-            const cleanup = () => {
-                if (promises[key] === promise) delete promises[key];
-            };
-            promise.then(cleanup, cleanup);
+            const cleanup = () => delete promises[key];
+            promises[key].then(cleanup, cleanup);
         }
         return promises[key] as ReturnType<F>;
     };

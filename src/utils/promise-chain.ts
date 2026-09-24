@@ -22,20 +22,14 @@ export class PromiseChain {
 
         let release: () => void;
         const currentTail = new Promise<void>((resolve) => (release = resolve));
+        const tail = previousTail ? previousTail.then(() => currentTail) : currentTail;
 
-        if (previousTail) {
-            this.locks.set(
-                key,
-                previousTail.then(() => currentTail),
-            );
-            await previousTail;
-        } else {
-            this.locks.set(key, currentTail);
-        }
+        this.locks.set(key, tail);
+        if (previousTail) await previousTail;
 
         return () => {
             release();
-            if (this.locks.get(key) === currentTail) {
+            if (this.locks.get(key) === tail) {
                 this.locks.delete(key);
             }
         };

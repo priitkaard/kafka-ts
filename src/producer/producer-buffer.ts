@@ -1,7 +1,11 @@
 import { API } from '../api';
 import { Cluster } from '../cluster';
+import { groupByLeaderId } from '../distributors/group-by-leader-id';
+import { groupPartitionsByTopic } from '../distributors/group-partitions-by-topic';
+import { Metadata } from '../metadata';
 import { Message } from '../types';
-import { ProducerState } from './producer-state';
+import { PromiseChain } from '../utils/promise-chain';
+import { isProducerIdError, ProducerState } from './producer-state';
 
 type BufferEntry = {
     messages: Message[];
@@ -9,11 +13,15 @@ type BufferEntry = {
     reject: (error: unknown) => void;
 };
 
+type TopicData = Parameters<typeof API.PRODUCE.request>[1]['topicData'];
+
 type ProducerBufferOptions = {
-    nodeId: number;
     maxBatchSize: number;
     cluster: Cluster;
+    metadata: Metadata;
     state: ProducerState;
+    partitionLocks: PromiseChain;
+    retry: (error: unknown, attempt: number) => Promise<void>;
 };
 
 export class ProducerBuffer {
@@ -26,31 +34,14 @@ export class ProducerBuffer {
     public enqueue(messages: Message[]): Promise<void> {
         return new Promise((resolve, reject) => {
             this.buffer.push({ messages, resolve, reject });
-            this.flush().catch((error) => this.rejectPending(error));
+            this.flush();
         });
-    }
-
-    private rejectPending(error: unknown) {
-        const pending = this.buffer.slice(this.head);
-
-        this.buffer = [];
-        this.head = 0;
-
-        pending.forEach(({ reject }) => reject(error));
     }
 
     private async flush() {
         if (this.isFlushing) return;
         this.isFlushing = true;
 
-        try {
-            await this.flushBuffer();
-        } finally {
-            this.isFlushing = false;
-        }
-    }
-
-    private async flushBuffer() {
         const { maxBatchSize } = this.options;
 
         while (true) {
@@ -58,26 +49,21 @@ export class ProducerBuffer {
             const resolvers: (() => void)[] = [];
             const rejecters: ((error: unknown) => void)[] = [];
 
-            try {
-                while (this.head < this.buffer.length) {
-                    const entry = this.buffer[this.head++];
+            while (this.head < this.buffer.length) {
+                const entry = this.buffer[this.head++];
 
-                    for (const message of entry.messages) batch.push(message);
-                    resolvers.push(entry.resolve);
-                    rejecters.push(entry.reject);
+                for (const message of entry.messages) batch.push(message);
+                resolvers.push(entry.resolve);
+                rejecters.push(entry.reject);
 
-                    const nextLength = this.buffer[this.head]?.messages.length ?? 0;
-                    if (batch.length + nextLength > maxBatchSize) {
-                        break;
-                    }
+                const nextLength = this.buffer[this.head]?.messages.length ?? 0;
+                if (batch.length + nextLength > maxBatchSize) {
+                    break;
                 }
-                if (!batch.length) break;
-
-                this.compactBuffer();
-            } catch (error) {
-                rejecters.forEach((reject) => reject(error));
-                throw error;
             }
+            if (!batch.length) break;
+
+            this.compactBuffer();
 
             try {
                 await this.produce(batch);
@@ -86,10 +72,52 @@ export class ProducerBuffer {
                 rejecters.forEach((reject) => reject(error));
             }
         }
+
+        this.isFlushing = false;
     }
 
     private async produce(batch: Message[]) {
-        const { cluster, state, nodeId } = this.options;
+        const partitions = batch.map((message) => `produce:${message.topic}:${message.partition}`);
+        await this.options.partitionLocks.run(partitions, () => this.produceLocked(batch));
+    }
+
+    private async produceLocked(batch: Message[]) {
+        const { state, retry } = this.options;
+
+        let request: { generation: number; topicData: TopicData } | undefined;
+        for (let attempt = 0; ; attempt++) {
+            try {
+                request ??= await this.createRequest(batch);
+                await this.sendToLeaders(request.topicData);
+                break;
+            } catch (error) {
+                try {
+                    await retry(error, attempt);
+                } catch (retryError) {
+                    if (request) state.reset(request.generation);
+                    throw retryError;
+                }
+                if (request && isProducerIdError(error)) {
+                    state.reset(request.generation);
+                    request = undefined;
+                }
+            }
+        }
+        const { generation, topicData } = request;
+        if (state.generation !== generation) return;
+
+        topicData.forEach(({ name, partitionData }) => {
+            partitionData.forEach(({ index, records }) => {
+                state.updateSequence(name, index, records.length);
+            });
+        });
+    }
+
+    private async createRequest(batch: Message[]) {
+        const { state } = this.options;
+
+        if (!state.isInitialized) await state.initProducerId();
+        const generation = state.generation;
 
         const topicPartitionMessages: { [topic: string]: { [partition: number]: Message[] } } = {};
         batch.forEach((message) => {
@@ -141,17 +169,33 @@ export class ProducerBuffer {
                 };
             }),
         }));
-        await cluster.sendRequestToNode(nodeId)(API.PRODUCE, {
-            transactionalId: null,
-            acks: -1,
-            timeoutMs: 30000,
-            topicData,
-        });
-        topicData.forEach(({ name, partitionData }) => {
-            partitionData.forEach(({ index, records }) => {
-                state.updateSequence(name, index, records.length);
-            });
-        });
+        return { generation, topicData };
+    }
+
+    private async sendToLeaders(topicData: TopicData) {
+        const { cluster, metadata } = this.options;
+
+        const partitions = topicData.flatMap(({ name, partitionData }) =>
+            partitionData.map(({ index }) => ({ topic: name, partition: index })),
+        );
+        const partitionsByLeaderId = groupByLeaderId(partitions, metadata.getTopicPartitionLeaderIds());
+
+        await Promise.all(
+            Object.entries(partitionsByLeaderId).map(([leaderId, leaderPartitions]) => {
+                const partitionsByTopic = groupPartitionsByTopic(leaderPartitions);
+                return cluster.sendRequestToNode(parseInt(leaderId))(API.PRODUCE, {
+                    transactionalId: null,
+                    acks: -1,
+                    timeoutMs: 30000,
+                    topicData: topicData
+                        .filter(({ name }) => name in partitionsByTopic)
+                        .map(({ name, partitionData }) => ({
+                            name,
+                            partitionData: partitionData.filter(({ index }) => partitionsByTopic[name].includes(index)),
+                        })),
+                });
+            }),
+        );
     }
 
     private compactBuffer() {

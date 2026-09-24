@@ -117,17 +117,7 @@ export class Cluster {
     private acquireBrokerShared = shared((nodeId: number) => this.acquireBroker(nodeId));
 
     private async getBroker(nodeId: number) {
-        const existingBroker = this.brokerById[nodeId];
-        if (existingBroker) return existingBroker;
-
-        const broker = await this.acquireBrokerShared(nodeId);
-
-        const currentBroker = this.brokerById[nodeId];
-        if (currentBroker && currentBroker !== broker) {
-            await this.safeDisconnect(broker);
-            return currentBroker;
-        }
-
+        const broker = this.brokerById[nodeId] ?? (await this.acquireBrokerShared(nodeId));
         this.brokerById[nodeId] = broker;
         return broker;
     }
@@ -154,6 +144,7 @@ export class Cluster {
         });
         try {
             await broker.connect();
+            if (!this.seedBroker) throw new ConnectionError('Cluster is not connected');
         } catch (error) {
             await this.safeDisconnect(broker);
             throw error;

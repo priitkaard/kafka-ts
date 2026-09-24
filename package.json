@@ -16,9 +16,9 @@
         "version:minor": "npm version minor",
         "version:major": "npm version major",
         "format": "prettier --write .",
-        "build": "tsc",
-        "typecheck": "tsc -p tsconfig.test.json",
-        "watch": "tsc -w",
+        "build": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc --noEmit",
+        "watch": "tsc -p tsconfig.build.json -w",
         "test": "vitest --testTimeout 60000 --bail 1"
     },
     "devDependencies": {

@@ -32,10 +32,29 @@ describe('ProducerState', () => {
         const state = createState();
 
         state.updateSequence('topic', 0, 5);
-        state.reset();
+        state.reset(state.generation);
 
         expect(state.getSequence('topic', 0)).toBe(0);
-        expect(state.producerId).toBe(0n);
-        expect(state.producerEpoch).toBe(0);
+        expect(state.isInitialized).toBe(false);
+    });
+
+    it('ignores a reset for a producer id that was already replaced', () => {
+        const state = createState();
+        const generation = state.generation;
+
+        state.reset(generation);
+        state.updateSequence('topic', 0, 5);
+        state.reset(generation);
+
+        expect(state.getSequence('topic', 0)).toBe(5);
+    });
+
+    it('treats producer id 0 as initialized', async () => {
+        const cluster = { sendRequest: async () => ({ producerId: 0n, producerEpoch: 0 }) } as unknown as Cluster;
+        const state = new ProducerState({ cluster });
+
+        await state.initProducerId();
+
+        expect(state.isInitialized).toBe(true);
     });
 });

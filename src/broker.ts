@@ -2,6 +2,8 @@ import { TcpSocketConnectOpts } from 'net';
 import { TLSSocketOptions } from 'tls';
 import { API } from './api';
 import { Connection, SendRequest } from './connection';
+import { ConnectionError } from './utils/error';
+import { shared } from './utils/shared';
 import { withTimeout } from './utils/timeout';
 
 export type SASLProvider = {
@@ -20,7 +22,8 @@ type BrokerOptions = {
 
 export class Broker {
     private connection: Connection;
-    public sendRequest: SendRequest;
+    private sendConnectionRequest: SendRequest;
+    private ready = false;
 
     constructor(private options: BrokerOptions) {
         this.connection = new Connection({
@@ -30,13 +33,22 @@ export class Broker {
             requestTimeout: this.options.requestTimeout,
             connectTimeout: this.options.connectTimeout,
         });
-        this.sendRequest = this.connection.sendRequest.bind(this.connection);
+        this.sendConnectionRequest = this.connection.sendRequest.bind(this.connection);
     }
 
-    public async connect() {
-        if (this.connection.isConnected()) {
+    public sendRequest: SendRequest = async (...args) => {
+        if (!this.ready) {
+            const { host, port } = this.options.options;
+            throw new ConnectionError(`Not connected to ${host}:${port}`);
+        }
+        return this.sendConnectionRequest(...args);
+    };
+
+    public connect = shared(async () => {
+        if (this.ready && this.connection.isConnected()) {
             return this;
         }
+        this.ready = false;
         await this.connection.connect();
 
         const { host, port } = this.options.options;
@@ -50,8 +62,9 @@ export class Broker {
             await this.disconnect().catch(() => {});
             throw error;
         }
+        this.ready = true;
         return this;
-    }
+    });
 
     private async handshake() {
         await this.fetchApiVersions();
@@ -60,11 +73,12 @@ export class Broker {
     }
 
     public async disconnect() {
+        this.ready = false;
         await this.connection.disconnect();
     }
 
     private async fetchApiVersions() {
-        const { versions } = await this.sendRequest(API.API_VERSIONS, {});
+        const { versions } = await this.sendConnectionRequest(API.API_VERSIONS, {});
         const versionsByApiKey = Object.fromEntries(
             versions.map(({ apiKey, minVersion, maxVersion }) => [apiKey, { minVersion, maxVersion }]),
         );
@@ -75,10 +89,10 @@ export class Broker {
         if (!this.options.sasl) {
             return;
         }
-        await this.sendRequest(API.SASL_HANDSHAKE, { mechanism: this.options.sasl.mechanism });
+        await this.sendConnectionRequest(API.SASL_HANDSHAKE, { mechanism: this.options.sasl.mechanism });
     }
 
     private async saslAuthenticate() {
-        await this.options.sasl?.authenticate({ sendRequest: this.sendRequest });
+        await this.options.sasl?.authenticate({ sendRequest: this.sendConnectionRequest });
     }
 }

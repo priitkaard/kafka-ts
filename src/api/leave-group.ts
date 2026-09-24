@@ -46,9 +46,7 @@ const LEAVE_GROUP_V3 = createApi<LeaveGroupRequest, LeaveGroupResponse>({
         encoder
             .writeString(body.groupId)
             .writeArray(body.members, (encoder, member) =>
-                encoder
-                    .writeString(member.memberId)
-                    .writeString(member.groupInstanceId),
+                encoder.writeString(member.memberId).writeString(member.groupInstanceId),
             ),
     response: (decoder) => {
         const result = {
@@ -96,10 +94,7 @@ const LEAVE_GROUP_V4 = createApi<LeaveGroupRequest, LeaveGroupResponse>({
         encoder
             .writeCompactString(body.groupId)
             .writeCompactArray(body.members, (encoder, member) =>
-                encoder
-                    .writeCompactString(member.memberId)
-                    .writeCompactString(member.groupInstanceId)
-                    .writeTagBuffer(),
+                encoder.writeCompactString(member.memberId).writeCompactString(member.groupInstanceId).writeTagBuffer(),
             )
             .writeTagBuffer(),
     response: (decoder) => {

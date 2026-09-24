@@ -5,7 +5,8 @@
         "target": "es2022",
         "module": "node16",
         "strict": true,
-        "forceConsistentCasingInFileNames": true,
+        "sourceMap": true,
+        "inlineSources": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
         "moduleResolution": "node16",
@@ -15,6 +16,5 @@
         "emitDecoratorMetadata": true,
         "experimentalDecorators": true
     },
-    "include": ["src/**/*"],
-    "exclude": ["src/**/*.test.ts"]
+    "include": ["src/**/*"]
 }

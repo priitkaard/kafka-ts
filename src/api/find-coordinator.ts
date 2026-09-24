@@ -43,11 +43,7 @@ const FIND_COORDINATOR_V3 = createApi<FindCoordinatorRequest, FindCoordinatorRes
     apiVersion: 3,
     requestHeaderVersion: 2,
     responseHeaderVersion: 1,
-    request: (encoder, data) =>
-        encoder
-            .writeCompactString(data.keys[0])
-            .writeInt8(data.keyType)
-            .writeTagBuffer(),
+    request: (encoder, data) => encoder.writeCompactString(data.keys[0]).writeInt8(data.keyType).writeTagBuffer(),
     response: (decoder) => {
         const result = {
             throttleTimeMs: decoder.readInt32(),

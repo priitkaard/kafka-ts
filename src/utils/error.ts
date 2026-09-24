@@ -24,7 +24,7 @@ export class KafkaTSApiError<T = any> extends KafkaTSError {
 export class ConnectionError extends KafkaTSError {
     constructor(message: string, stack?: string) {
         super(message);
-        this.stack += `\n${stack}`;
+        if (stack) this.stack += `\n${stack}`;
     }
 }
 
@@ -32,11 +32,15 @@ export const getErrorMessage = (error: unknown): string => {
     if (!(error instanceof Error)) return String(error);
 
     if (error instanceof AggregateError) {
-        const messages = (error.errors as unknown[])
-            .map((cause) => (cause instanceof Error ? getErrorMessage(cause) : String(cause)))
-            .filter(Boolean);
+        const messages = (error.errors as unknown[]).map(getErrorMessage).filter(Boolean);
         if (messages.length) return messages.join(', ');
     }
 
     return error.message || (error as NodeJS.ErrnoException).code || error.name;
 };
+
+export class UnknownPartitionError extends KafkaTSError {
+    constructor(topic: string, partition: number) {
+        super(`Partition ${partition} does not exist on topic "${topic}"`);
+    }
+}

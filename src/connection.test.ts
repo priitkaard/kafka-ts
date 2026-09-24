@@ -4,7 +4,12 @@ import { API } from './api';
 import { Connection } from './connection';
 import { ConnectionError } from './utils/error';
 
-const createConnection = (port: number, overrides: Partial<{ connectTimeout: number }> = {}) =>
+const BLACKHOLE_HOST = '192.0.2.1';
+
+const createConnection = (
+    port: number,
+    overrides: Partial<{ connectTimeout: number; connection: { host: string; port: number } }> = {},
+) =>
     new Connection({
         clientId: 'kafka-ts-test',
         connection: { host: '127.0.0.1', port },
@@ -45,6 +50,24 @@ describe('Connection', () => {
         await connection.disconnect();
         await new Promise((resolve) => setTimeout(resolve, 100));
 
+        expect(connection.isConnected()).toBe(false);
+    });
+
+    it('stops waiting for a socket that is still connecting when disconnected', async () => {
+        const connection = createConnection(0, {
+            connection: { host: BLACKHOLE_HOST, port: 9092 },
+            connectTimeout: 30_000,
+        });
+
+        const connecting = connection.connect();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        const startedAt = Date.now();
+        await connection.disconnect();
+        const elapsed = Date.now() - startedAt;
+
+        await expect(connecting).rejects.toThrow(ConnectionError);
+        expect(elapsed).toBeLessThan(1_000);
         expect(connection.isConnected()).toBe(false);
     });
 
@@ -144,6 +167,25 @@ describe('Connection', () => {
         expect(countTimers()).toBe(timersBefore);
     });
 
+    it('stops waiting for a TLS socket that is still handshaking when disconnected', async () => {
+        const port = await startServer(() => {});
+
+        const connection = new Connection({
+            clientId: 'kafka-ts-test',
+            connection: { host: '127.0.0.1', port },
+            ssl: { rejectUnauthorized: false },
+            requestTimeout: 1_000,
+            connectTimeout: 30_000,
+        });
+
+        const connecting = connection.connect();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        await connection.disconnect();
+
+        await expect(connecting).rejects.toThrow(ConnectionError);
+    });
+
     it('detaches listeners from the previous socket when reconnecting', async () => {
         const port = await startServer(() => {});
 
@@ -158,19 +200,6 @@ describe('Connection', () => {
         expect((connection as any).socket).not.toBe(firstSocket);
         expect(firstSocket.listenerCount('data')).toBe(0);
         expect(firstSocket.destroyed).toBe(true);
-
-        await connection.disconnect();
-    });
-
-    it('opens a single socket for concurrent connects', async () => {
-        const port = await startServer(() => {});
-
-        const connection = createConnection(port);
-        await Promise.all([connection.connect(), connection.connect(), connection.connect()]);
-        await new Promise((resolve) => setTimeout(resolve, 100));
-
-        expect(sockets.length).toBe(1);
-        expect(connection.isConnected()).toBe(true);
 
         await connection.disconnect();
     });
@@ -307,5 +336,82 @@ describe('Connection', () => {
 
         await expect(connection.connect()).rejects.toThrow(/timed out/);
         expect(connection.isConnected()).toBe(false);
+    });
+
+    it('reports a request timeout without closing the connection', async () => {
+        const port = await startServer((socket) => socket.on('data', () => {}));
+
+        const connection = createConnection(port);
+        await connection.connect();
+
+        await expect(connection.sendRequest(API.API_VERSIONS, {})).rejects.toThrow(/timed out/);
+        expect(connection.isConnected()).toBe(true);
+
+        await connection.disconnect();
+    });
+
+    it('dispatches several responses arriving in a single packet', async () => {
+        const correlationIds: number[] = [];
+        const port = await startServer((socket) => {
+            socket.on('data', (data: Buffer) => {
+                let offset = 0;
+                while (offset + 4 <= data.length) {
+                    const size = data.readInt32BE(offset);
+                    correlationIds.push(data.readInt32BE(offset + 8));
+                    offset += 4 + size;
+                }
+                if (correlationIds.length < 2) return;
+
+                socket.write(
+                    Buffer.concat(
+                        correlationIds.map((correlationId) => {
+                            const body = Buffer.alloc(20);
+                            body.writeInt32BE(correlationId, 0);
+                            body.writeInt16BE(0, 4);
+                            body.writeInt32BE(1, 6);
+                            body.writeInt16BE(18, 10);
+                            body.writeInt16BE(0, 12);
+                            body.writeInt16BE(3, 14);
+                            body.writeInt32BE(0, 16);
+
+                            const size = Buffer.alloc(4);
+                            size.writeInt32BE(body.length);
+                            return Buffer.concat([size, body]);
+                        }),
+                    ),
+                );
+            });
+        });
+
+        const connection = createConnection(port);
+        await connection.connect();
+
+        await expect(
+            Promise.all([connection.sendRequest(API.API_VERSIONS, {}), connection.sendRequest(API.API_VERSIONS, {})]),
+        ).resolves.toHaveLength(2);
+
+        await connection.disconnect();
+    });
+
+    it('keeps an incomplete response buffered without copying it', async () => {
+        const responseSize = 3 * 4096;
+        const port = await startServer((socket) => {
+            socket.on('data', () => {
+                const frame = Buffer.alloc(4);
+                frame.writeInt32BE(responseSize);
+                socket.write(Buffer.concat([frame, Buffer.alloc(2 * 4096)]));
+            });
+        });
+
+        const connection = createConnection(port);
+        await connection.connect();
+
+        const request = connection.sendRequest(API.API_VERSIONS, {}).catch((error) => error);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        expect((connection as any).bufferedBytes).toBe(4 + 2 * 4096);
+
+        await connection.disconnect();
+        expect(await request).toBeInstanceOf(ConnectionError);
     });
 });

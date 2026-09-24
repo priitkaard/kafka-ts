@@ -21,6 +21,7 @@ type ConnectionOptions = {
 };
 
 const SOCKET_CLOSE_TIMEOUT_MS = 5_000;
+const SIZE_PREFIX_BYTES = 4;
 
 type RawResonse = { responseDecoder: Decoder; responseSize: number };
 
@@ -37,9 +38,9 @@ export class Connection {
     } = {};
     private lastCorrelationId = 0;
     private chunks: Buffer[] = [];
+    private bufferedBytes = 0;
     private versions: Versions | undefined;
     private connected = false;
-    private connecting: Promise<void> | undefined;
     private closing: Promise<void> | undefined;
     private generation = 0;
 
@@ -51,18 +52,16 @@ export class Connection {
 
     @trace()
     public async connect() {
-        this.connecting ??= this.establishConnection().finally(() => {
-            this.connecting = undefined;
-        });
-        return this.connecting;
-    }
-
-    private async establishConnection() {
         const generation = this.generation;
 
         await this.teardown();
 
+        if (generation !== this.generation) {
+            throw new ConnectionError('Connection was closed while connecting');
+        }
+
         this.chunks = [];
+        this.bufferedBytes = 0;
 
         const { stack } = new Error();
         const { ssl, connection, connectTimeout } = this.options;
@@ -90,6 +89,8 @@ export class Connection {
                 clearTimeout(timeout);
                 socket.removeListener(readyEvent, onReady);
                 socket.removeListener('error', onError);
+                socket.removeListener('close', onClose);
+                socket.on('error', () => {});
                 callback();
             };
             const onReady = () => finish(resolve);
@@ -98,6 +99,10 @@ export class Connection {
                     socket.destroy();
                     reject(new ConnectionError(getErrorMessage(error), stack));
                 });
+            const onClose = () =>
+                finish(() =>
+                    reject(new ConnectionError(`Connection to ${address} was closed while connecting`, stack)),
+                );
 
             const timeout = setTimeout(
                 () =>
@@ -110,6 +115,7 @@ export class Connection {
 
             socket.once(readyEvent, onReady);
             socket.once('error', onError);
+            socket.once('close', onClose);
         });
 
         if (generation !== this.generation) {
@@ -136,15 +142,23 @@ export class Connection {
     }
 
     private async teardown() {
+        const wasConnected = this.connected;
         this.connected = false;
         this.rejectPendingRequests(new ConnectionError('Connection closed'));
 
-        this.closing ??= this.closeSocket(this.socket);
+        this.closing ??= this.closeSocket(this.socket, wasConnected);
         return this.closing;
     }
 
-    private async closeSocket(socket: Socket) {
+    private async closeSocket(socket: Socket, wasConnected: boolean) {
         socket.removeAllListeners('data');
+
+        const canCloseGracefully = wasConnected && !socket.connecting && !socket.pending;
+        if (!canCloseGracefully) {
+            socket.destroy();
+            return;
+        }
+
         socket.removeAllListeners('close');
         socket.removeAllListeners('error');
         socket.on('error', () => {});
@@ -153,6 +167,7 @@ export class Connection {
 
         await new Promise<void>((resolve) => {
             const timeout = setTimeout(resolve, SOCKET_CLOSE_TIMEOUT_MS);
+            timeout.unref();
             socket.end(() => {
                 clearTimeout(timeout);
                 resolve();
@@ -211,14 +226,15 @@ export class Connection {
         }
 
         const encoder = new Encoder()
+            .writeInt32(0)
             .writeInt16(api.apiKey)
             .writeInt16(api.apiVersion)
             .writeInt32(correlationId)
             .writeString(this.options.clientId ?? '');
         if (api.requestHeaderVersion === 2) encoder.writeTagBuffer();
 
-        const request = api.request(encoder, body);
-        const requestEncoder = new Encoder().writeInt32(request.getBufferLength()).writeEncoder(request);
+        const requestBuffer = api.request(encoder, body).value();
+        requestBuffer.writeInt32BE(requestBuffer.length - SIZE_PREFIX_BYTES, 0);
 
         const { stack } = new Error();
 
@@ -235,7 +251,7 @@ export class Connection {
 
                 try {
                     this.queue[correlationId] = { api, resolve, reject };
-                    await this.write(socket, requestEncoder.value());
+                    await this.write(socket, requestBuffer);
                 } catch (error) {
                     delete this.queue[correlationId];
                     reject(new ConnectionError(getErrorMessage(error), stack));
@@ -284,21 +300,21 @@ export class Connection {
 
     private consume(buffer: Buffer) {
         this.chunks.push(buffer);
+        this.bufferedBytes += buffer.length;
 
-        let remaining: Buffer = Buffer.concat(this.chunks);
-        this.chunks = [];
-
-        while (true) {
-            const decoder = new Decoder(remaining);
-            if (!decoder.canReadBytes(4)) break;
-
-            const responseSize = decoder.readInt32();
+        while (this.bufferedBytes >= SIZE_PREFIX_BYTES) {
+            const responseSize = Buffer.concat(this.chunks, SIZE_PREFIX_BYTES).readInt32BE(0);
             if (responseSize < 0) {
                 throw new ConnectionError(`Invalid response size: ${responseSize}`);
             }
-            if (!decoder.canReadBytes(responseSize)) break;
+            const frameSize = SIZE_PREFIX_BYTES + responseSize;
+            if (this.bufferedBytes < frameSize) break;
 
-            const responseDecoder = new Decoder(decoder.read(responseSize));
+            const data = this.chunks.length === 1 ? this.chunks[0] : Buffer.concat(this.chunks);
+            this.chunks = data.length > frameSize ? [data.subarray(frameSize)] : [];
+            this.bufferedBytes = data.length - frameSize;
+
+            const responseDecoder = new Decoder(data.subarray(SIZE_PREFIX_BYTES, frameSize));
             const correlationId = responseDecoder.readInt32();
 
             const context = this.queue[correlationId];
@@ -310,11 +326,7 @@ export class Connection {
             } else {
                 log.debug('Could not find pending request for correlationId', { correlationId });
             }
-
-            remaining = decoder.read();
         }
-
-        if (remaining.length) this.chunks.push(remaining);
     }
 
     private nextCorrelationId() {

@@ -11,7 +11,7 @@ import { PromiseChain } from '../utils/promise-chain';
 import { shared } from '../utils/shared';
 import { createTracer } from '../utils/tracer';
 import { ProducerBuffer } from './producer-buffer';
-import { ProducerState } from './producer-state';
+import { isProducerIdError, ProducerState } from './producer-state';
 
 const trace = createTracer('Producer');
 
@@ -31,6 +31,7 @@ export class Producer {
     private partition: Partition;
     private chain = new PromiseChain();
     private bufferByNodeId: Record<number, ProducerBuffer> = {};
+    private closed = false;
 
     constructor(
         private cluster: Cluster,
@@ -52,15 +53,7 @@ export class Producer {
 
     @trace(() => ({ root: true }))
     public async send(messages: Message[]) {
-        return this.sendBatch(messages, 0);
-    }
-
-    public async close() {
-        await this.cluster.disconnect();
-    }
-
-    private async sendBatch(messages: Message[], attempt: number): Promise<void> {
-        await this.ensureProducerInitialized();
+        await this.cluster.ensureConnected();
 
         const topics = [...new Set(messages.map((message) => message.topic))];
         await this.fetchMetadataForTopics(topics);
@@ -72,41 +65,41 @@ export class Producer {
         const messagesByLeaderId = groupByLeaderId(partitionedMessages, this.metadata.getTopicPartitionLeaderIds());
 
         await Promise.all(
-            Object.entries(messagesByLeaderId).map(async ([leaderId, leaderMessages]) => {
+            Object.entries(messagesByLeaderId).map(([leaderId, leaderMessages]) => {
                 const nodeId = parseInt(leaderId);
                 const buffer = (this.bufferByNodeId[nodeId] ??= new ProducerBuffer({
-                    nodeId,
                     maxBatchSize: this.options.maxBatchSize,
                     cluster: this.cluster,
+                    metadata: this.metadata,
                     state: this.state,
+                    partitionLocks: this.chain,
+                    retry: this.retry,
                 }));
-                try {
-                    await buffer.enqueue(leaderMessages);
-                } catch (error) {
-                    if (attempt >= this.options.maxRetries) {
-                        log.warn('Retries exhausted', { nodeId, lastError: error });
-                        throw error;
-                    }
-                    await this.handleError(error, nodeId);
-                    await delay(this.getRetryDelayMs(attempt));
-
-                    return this.sendBatch(leaderMessages, attempt + 1);
-                }
+                return buffer.enqueue(leaderMessages);
             }),
         );
     }
+
+    public async close() {
+        this.closed = true;
+        await this.cluster.disconnect();
+    }
+
+    private retry = async (error: unknown, attempt: number) => {
+        if (this.closed) throw error;
+        if (attempt >= this.options.maxRetries) {
+            log.warn('Retries exhausted', { lastError: error });
+            throw error;
+        }
+        await this.handleError(error);
+        await delay(this.getRetryDelayMs(attempt));
+        if (this.closed) throw error;
+    };
 
     private getRetryDelayMs(attempt: number) {
         const { retryDelayMs, maxRetryDelayMs } = this.options;
         return Math.min(maxRetryDelayMs, retryDelayMs * 2 ** attempt);
     }
-
-    private ensureProducerInitialized = shared(async () => {
-        await this.cluster.ensureConnected();
-        if (!this.state.producerId) {
-            await this.state.initProducerId();
-        }
-    });
 
     private fetchMetadataForTopics = shared(async (topics: string[]) => {
         const { allowTopicAutoCreation } = this.options;
@@ -116,45 +109,27 @@ export class Producer {
         );
     });
 
-    private reconnect = shared(async () => {
-        this.bufferByNodeId = {};
-        this.state.reset();
-        await this.cluster.disconnect().catch((error) => {
-            log.debug('Failed to disconnect cluster', { reason: (error as Error).message });
-        });
+    private refreshMetadata = shared(async () => {
+        await this.cluster.ensureConnected();
+        const topics = Object.keys(this.metadata.getTopicPartitions());
+        await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation: false });
     });
 
-    private async handleError(error: unknown, nodeId: number): Promise<void> {
+    private async handleError(error: unknown): Promise<void> {
         if (error instanceof ConnectionError) {
-            log.debug('Connection error while producing. Reconnecting...', {
-                nodeId,
-                reason: error.message,
-            });
-            await this.reconnect();
+            log.debug('Connection error while producing. Refreshing metadata...', { reason: error.message });
+            await this.refreshMetadata();
             return;
         }
 
         await handleApiError(error).catch(async (error) => {
             if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_LEADER_OR_FOLLOWER) {
                 log.debug('Refreshing metadata', { reason: error.message });
-                const topics = Object.keys(this.metadata.getTopicPartitions());
-                await this.metadata.fetchMetadata({ topics, allowTopicAutoCreation: false });
+                await this.refreshMetadata();
                 return;
             }
-            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.OUT_OF_ORDER_SEQUENCE_NUMBER) {
-                log.debug('Out of order sequence number. Reinitializing producer ID');
-                await this.state.initProducerId();
-                return;
-            }
-            const fencedErrorCodes: number[] = [
-                API_ERROR.UNKNOWN_PRODUCER_ID,
-                API_ERROR.INVALID_PRODUCER_EPOCH,
-                API_ERROR.PRODUCER_FENCED,
-            ];
-            if (error instanceof KafkaTSApiError && fencedErrorCodes.includes(error.errorCode)) {
-                log.debug('Producer ID is no longer valid. Reinitializing producer ID', { reason: error.message });
-                this.state.reset();
-                await this.state.initProducerId();
+            if (isProducerIdError(error)) {
+                log.debug('Producer ID is no longer valid. Retrying with a new producer ID', { reason: error.message });
                 return;
             }
             throw error;

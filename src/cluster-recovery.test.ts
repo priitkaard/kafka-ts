@@ -38,11 +38,15 @@ const metadataResponse = (correlationId: number, port: number) =>
 class FakeBroker {
     private server: Server | undefined;
     private sockets: Socket[] = [];
+    public openSockets = new Set<Socket>();
     public port = 0;
 
     async start(port = 0) {
         this.server = net.createServer({ allowHalfOpen: true }, (socket) => {
             this.sockets.push(socket);
+            this.openSockets.add(socket);
+            socket.on('end', () => this.openSockets.delete(socket));
+            socket.on('close', () => this.openSockets.delete(socket));
             socket.on('error', () => {});
             socket.on('data', (data: Buffer) => this.handleRequest(socket, data));
         });
@@ -148,5 +152,20 @@ describe('Cluster recovery', () => {
         }
 
         await cluster.disconnect();
+    });
+
+    it('does not keep a broker connection acquired while disconnecting', async () => {
+        broker = new FakeBroker();
+        await broker.start();
+
+        const cluster = createCluster(broker.port);
+        await cluster.connect();
+
+        const request = cluster.sendRequestToNode(1)(API.METADATA, { topics: [] });
+        await cluster.disconnect();
+
+        await expect(request).rejects.toThrow(/Cluster is not connected/);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        expect(broker.openSockets.size).toBe(0);
     });
 });

@@ -32,7 +32,6 @@ export class ConsumerGroup {
     private memberIds: string[] = [];
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private heartbeatError: KafkaTSError | null = null;
-    private isHeartbeating = false;
 
     constructor(private options: ConsumerGroupOptions) {}
 
@@ -54,21 +53,25 @@ export class ConsumerGroup {
         this.stopHeartbeater();
         this.heartbeatError = null;
 
-        this.heartbeatInterval = setInterval(async () => {
-            if (this.isHeartbeating) return;
-            this.isHeartbeating = true;
+        let isHeartbeating = false;
+        const heartbeatInterval = setInterval(async () => {
+            if (isHeartbeating) return;
+            isHeartbeating = true;
 
             try {
                 await this.heartbeat();
             } catch (error) {
+                if (this.heartbeatInterval !== heartbeatInterval) return;
+
                 this.heartbeatError = error as KafkaTSError;
                 if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
                     this.options.consumer.emit('rebalanceInProgress');
                 }
             } finally {
-                this.isHeartbeating = false;
+                isHeartbeating = false;
             }
         }, 5000);
+        this.heartbeatInterval = heartbeatInterval;
     }
 
     private async stopHeartbeater() {
@@ -76,7 +79,6 @@ export class ConsumerGroup {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
         }
-        this.isHeartbeating = false;
     }
 
     public handleLastHeartbeat() {

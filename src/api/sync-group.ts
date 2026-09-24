@@ -57,9 +57,7 @@ const SYNC_GROUP_V3 = createApi<SyncGroupRequest, SyncGroupResponse>({
             .writeString(data.memberId)
             .writeString(data.groupInstanceId)
             .writeArray(data.assignments, (encoder, assignment) =>
-                encoder
-                    .writeString(assignment.memberId)
-                    .writeBytes(encodeAssignment(assignment.assignment)),
+                encoder.writeString(assignment.memberId).writeBytes(encodeAssignment(assignment.assignment)),
             ),
     response: (decoder) => {
         const result = {
