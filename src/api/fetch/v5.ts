@@ -1,5 +1,5 @@
 import { createApi } from '../../utils/api';
-import { decodeRecordBatch, throwIfError } from './common';
+import { decodeRecordBatch, throwIfError, withDecompressions } from './common';
 import { FETCH_V4 } from './v4';
 
 /*
@@ -54,26 +54,28 @@ export const FETCH_V5 = createApi({
                             .writeInt32(partition.partitionMaxBytes),
                     ),
             ),
-    response: (decoder) =>
-        throwIfError({
-            throttleTimeMs: decoder.readInt32(),
-            errorCode: 0,
-            sessionId: 0,
-            responses: decoder.readArray((response) => ({
-                topicName: response.readString()!,
-                partitions: response.readArray((partition) => ({
-                    partitionIndex: partition.readInt32(),
-                    errorCode: partition.readInt16(),
-                    highWatermark: partition.readInt64(),
-                    lastStableOffset: partition.readInt64(),
-                    logStartOffset: partition.readInt64(),
-                    abortedTransactions: partition.readArray((abortedTransaction) => ({
-                        producerId: abortedTransaction.readInt64(),
-                        firstOffset: abortedTransaction.readInt64(),
+    response: async (decoder) =>
+        throwIfError(
+            await withDecompressions((decompressions) => ({
+                throttleTimeMs: decoder.readInt32(),
+                errorCode: 0,
+                sessionId: 0,
+                responses: decoder.readArray((response) => ({
+                    topicName: response.readString()!,
+                    partitions: response.readArray((partition) => ({
+                        partitionIndex: partition.readInt32(),
+                        errorCode: partition.readInt16(),
+                        highWatermark: partition.readInt64(),
+                        lastStableOffset: partition.readInt64(),
+                        logStartOffset: partition.readInt64(),
+                        abortedTransactions: partition.readArray((abortedTransaction) => ({
+                            producerId: abortedTransaction.readInt64(),
+                            firstOffset: abortedTransaction.readInt64(),
+                        })),
+                        preferredReadReplica: -1,
+                        records: decodeRecordBatch(partition, partition.readInt32(), decompressions),
                     })),
-                    preferredReadReplica: -1,
-                    records: decodeRecordBatch(partition, partition.readInt32()),
                 })),
             })),
-        }),
+        ),
 });

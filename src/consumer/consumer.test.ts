@@ -115,6 +115,36 @@ describe('Consumer', () => {
         expect(fetchMetadata).toHaveBeenCalledTimes(2);
     });
 
+    it('resets only the partitions that are out of range', async () => {
+        const outOfRange = {
+            responses: [
+                {
+                    topicName: 'topic',
+                    partitions: [
+                        { partitionIndex: 0, errorCode: 0 },
+                        { partitionIndex: 1, errorCode: API_ERROR.OFFSET_OUT_OF_RANGE },
+                    ],
+                },
+            ],
+        };
+        const cluster = createCluster();
+        let requests = 0;
+        cluster.sendRequestToNode = () => async () => {
+            if (requests++) return fetchResponse() as never;
+            throw new KafkaTSApiError(API_ERROR.OFFSET_OUT_OF_RANGE, null, outOfRange);
+        };
+        const consumer = new Consumer(cluster, { topics: ['topic'], onBatch: () => {} });
+        const fetchOffsets = vi.fn(async () => {});
+
+        (consumer as any).metadata = { getTopicIdByName: () => '' };
+        (consumer as any).offsetManager = { getPosition: () => 0n };
+        (consumer as any).fetchOffsets = fetchOffsets;
+
+        await (consumer as any).fetch(1, { topic: [0, 1] });
+
+        expect(fetchOffsets).toHaveBeenCalledExactlyOnceWith({ topic: [1] });
+    });
+
     it('closes when the group reports the instance id was fenced', async () => {
         const consumer = new Consumer(createCluster(), { topics: ['topic'], groupId: 'group', onBatch: () => {} });
 

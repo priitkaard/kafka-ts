@@ -169,9 +169,7 @@ export class Decoder {
         return this.readInt8() < 0 ? null : callback(this);
     }
 
-    public readRecords<T>(callback: (opts: Decoder) => T): T[] {
-        const length = this.readInt32();
-
+    public readRecords<T>(length: number, callback: (opts: Decoder) => T): T[] {
         const results: T[] = [];
         for (let i = 0; i < length; i++) {
             const size = this.readVarInt();

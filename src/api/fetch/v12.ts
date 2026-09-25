@@ -1,5 +1,5 @@
 import { createApi } from '../../utils/api';
-import { decodeRecordBatch, throwIfError } from './common';
+import { decodeRecordBatch, throwIfError, withDecompressions } from './common';
 import { FETCH_V11 } from './v11';
 
 /*
@@ -91,30 +91,32 @@ export const FETCH_V12 = createApi({
             )
             .writeCompactString(data.rackId)
             .writeTagBuffer(),
-    response: (decoder) =>
-        throwIfError({
-            throttleTimeMs: decoder.readInt32(),
-            errorCode: decoder.readInt16(),
-            sessionId: decoder.readInt32(),
-            responses: decoder.readCompactArray((response) => ({
-                topicName: response.readCompactString()!,
-                partitions: response.readCompactArray((partition) => ({
-                    partitionIndex: partition.readInt32(),
-                    errorCode: partition.readInt16(),
-                    highWatermark: partition.readInt64(),
-                    lastStableOffset: partition.readInt64(),
-                    logStartOffset: partition.readInt64(),
-                    abortedTransactions: partition.readCompactArray((abortedTransaction) => ({
-                        producerId: abortedTransaction.readInt64(),
-                        firstOffset: abortedTransaction.readInt64(),
-                        tags: abortedTransaction.readTagBuffer(),
+    response: async (decoder) =>
+        throwIfError(
+            await withDecompressions((decompressions) => ({
+                throttleTimeMs: decoder.readInt32(),
+                errorCode: decoder.readInt16(),
+                sessionId: decoder.readInt32(),
+                responses: decoder.readCompactArray((response) => ({
+                    topicName: response.readCompactString()!,
+                    partitions: response.readCompactArray((partition) => ({
+                        partitionIndex: partition.readInt32(),
+                        errorCode: partition.readInt16(),
+                        highWatermark: partition.readInt64(),
+                        lastStableOffset: partition.readInt64(),
+                        logStartOffset: partition.readInt64(),
+                        abortedTransactions: partition.readCompactArray((abortedTransaction) => ({
+                            producerId: abortedTransaction.readInt64(),
+                            firstOffset: abortedTransaction.readInt64(),
+                            tags: abortedTransaction.readTagBuffer(),
+                        })),
+                        preferredReadReplica: partition.readInt32(),
+                        records: decodeRecordBatch(partition, partition.readUVarInt() - 1, decompressions),
+                        tags: partition.readTagBuffer(),
                     })),
-                    preferredReadReplica: partition.readInt32(),
-                    records: decodeRecordBatch(partition, partition.readUVarInt() - 1),
-                    tags: partition.readTagBuffer(),
+                    tags: response.readTagBuffer(),
                 })),
-                tags: response.readTagBuffer(),
+                tags: decoder.readTagBuffer(),
             })),
-            tags: decoder.readTagBuffer(),
-        }),
+        ),
 });

@@ -379,7 +379,12 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
             ) {
                 throw new StaleMetadataError(getErrorMessage(error));
             }
-            await this.handleError(error);
+            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.OFFSET_OUT_OF_RANGE) {
+                log.warn('Offset out of range. Resetting offsets.');
+                await this.fetchOffsets(this.getOutOfRangeAssignment(error.response));
+            } else {
+                await this.handleError(error);
+            }
             nextOffsets = {};
         };
 
@@ -417,11 +422,25 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
         });
     }
 
-    private async fetchOffsets(): Promise<void> {
+    private async fetchOffsets(assignment?: Assignment): Promise<void> {
         return withRetry(this.handleError.bind(this))(async () => {
             const { fromTimestamp } = this.options;
-            await this.offsetManager.fetchOffsets({ fromTimestamp });
+            await this.offsetManager.fetchOffsets({ fromTimestamp, assignment });
         });
+    }
+
+    private getOutOfRangeAssignment(response: FetchResponse) {
+        const assignment: Assignment = {};
+        response.responses.forEach((response) => {
+            const topic = this.getTopicName(response);
+            response.partitions.forEach(({ partitionIndex, errorCode }) => {
+                if (errorCode !== API_ERROR.OFFSET_OUT_OF_RANGE) return;
+
+                assignment[topic] ??= [];
+                assignment[topic].push(partitionIndex);
+            });
+        });
+        return assignment;
     }
 
     private async handleError(error: unknown) {
@@ -429,11 +448,6 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
             if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_LEADER_OR_FOLLOWER) {
                 log.debug('Refreshing metadata', { reason: error.message });
                 await this.fetchMetadata();
-                return;
-            }
-            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.OFFSET_OUT_OF_RANGE) {
-                log.warn('Offset out of range. Resetting offsets.');
-                await this.fetchOffsets();
                 return;
             }
             throw error;

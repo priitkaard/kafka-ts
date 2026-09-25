@@ -75,10 +75,16 @@ export class OffsetManager {
         });
     }
 
-    public async fetchOffsets(options: { fromTimestamp: bigint }) {
+    public async fetchOffsets({
+        fromTimestamp,
+        assignment = this.options.metadata.getAssignment(),
+    }: {
+        fromTimestamp: bigint;
+        assignment?: Assignment;
+    }) {
         const { metadata } = this.options;
 
-        const topicPartitions = Object.entries(metadata.getAssignment()).flatMap(([topic, partitions]) =>
+        const topicPartitions = Object.entries(assignment).flatMap(([topic, partitions]) =>
             partitions.map((partition) => ({ topic, partition })),
         );
         const topicPartitionsByLeaderId = groupByLeaderId(topicPartitions, metadata.getTopicPartitionLeaderIds());
@@ -86,7 +92,7 @@ export class OffsetManager {
         await Promise.all(
             Object.entries(topicPartitionsByLeaderId).map(([leaderId, topicPartitions]) =>
                 this.listOffsets({
-                    ...options,
+                    fromTimestamp,
                     nodeId: parseInt(leaderId),
                     nodeAssignment: groupPartitionsByTopic(topicPartitions),
                 }),

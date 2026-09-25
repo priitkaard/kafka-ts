@@ -1,3 +1,4 @@
+import { findCodec } from '../../codecs';
 import { Decoder } from '../../utils/decoder';
 import { KafkaTSApiError, KafkaTSError } from '../../utils/error';
 
@@ -94,7 +95,16 @@ export const throwIfError = <T extends FetchResponse>(result: T) => {
     return result;
 };
 
-export const decodeRecordBatch = (decoder: Decoder, size: number) => {
+export const withDecompressions = async <T>(decode: (decompressions: Promise<void>[]) => T) => {
+    const decompressions: Promise<void>[] = [];
+    try {
+        return decode(decompressions);
+    } finally {
+        await Promise.all(decompressions);
+    }
+};
+
+export const decodeRecordBatch = (decoder: Decoder, size: number, decompressions: Promise<void>[]) => {
     if (size <= 0) {
         return [];
     }
@@ -131,10 +141,6 @@ export const decodeRecordBatch = (decoder: Decoder, size: number) => {
         const isControlBatch = !!((attributes & 0x20) >> 5);
         const hasDeleteHorizonMs = !!((attributes & 0x40) >> 6);
 
-        if (compression !== 0) {
-            throw new KafkaTSError(`Unsupported compression: ${compression}`);
-        }
-
         const lastOffsetDelta = batchDecoder.readInt32();
         const baseTimestamp = batchDecoder.readInt64();
         const maxTimestamp = batchDecoder.readInt64();
@@ -142,9 +148,9 @@ export const decodeRecordBatch = (decoder: Decoder, size: number) => {
         const producerId = batchDecoder.readInt64();
         const producerEpoch = batchDecoder.readInt16();
         const baseSequence = batchDecoder.readInt32();
-        const records = decodeRecords(batchDecoder);
+        const recordsCount = batchDecoder.readInt32();
 
-        results.push({
+        const batch = {
             baseOffset,
             batchLength,
             partitionLeaderEpoch,
@@ -163,14 +169,25 @@ export const decodeRecordBatch = (decoder: Decoder, size: number) => {
             producerId,
             producerEpoch,
             baseSequence,
-            records,
-        });
+            records: compression ? [] : decodeRecords(batchDecoder, recordsCount),
+        };
+        if (compression) {
+            const payload = batchDecoder.read();
+            decompressions.push(
+                findCodec(compression)
+                    .decompress(payload)
+                    .then((data) => {
+                        batch.records = decodeRecords(new Decoder(data), recordsCount);
+                    }),
+            );
+        }
+        results.push(batch);
     }
     return results;
 };
 
-const decodeRecords = (decoder: Decoder) =>
-    decoder.readRecords((record) => ({
+const decodeRecords = (decoder: Decoder, length: number) =>
+    decoder.readRecords(length, (record) => ({
         attributes: record.readInt8(),
         timestampDelta: record.readVarLong(),
         offsetDelta: record.readVarInt(),

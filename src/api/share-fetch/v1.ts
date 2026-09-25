@@ -1,5 +1,5 @@
 import { createApi } from '../../utils/api';
-import { decodeRecordBatch } from '../fetch';
+import { decodeRecordBatch, withDecompressions } from '../fetch';
 import { ShareFetchRequest, ShareFetchResponse, throwIfError } from './common';
 
 /*
@@ -95,43 +95,45 @@ export const SHARE_FETCH_V1 = createApi<ShareFetchRequest, ShareFetchResponse>({
                     .writeTagBuffer(),
             )
             .writeTagBuffer(),
-    response: (decoder) =>
-        throwIfError({
-            throttleTimeMs: decoder.readInt32(),
-            errorCode: decoder.readInt16(),
-            errorMessage: decoder.readCompactString(),
-            acquisitionLockTimeoutMs: decoder.readInt32(),
-            responses: decoder.readCompactArray((response) => ({
-                topicId: response.readUUID(),
-                partitions: response.readCompactArray((partition) => ({
-                    partitionIndex: partition.readInt32(),
-                    errorCode: partition.readInt16(),
-                    errorMessage: partition.readCompactString(),
-                    acknowledgeErrorCode: partition.readInt16(),
-                    acknowledgeErrorMessage: partition.readCompactString(),
-                    currentLeader: partition.readStruct((currentLeader) => ({
-                        leaderId: currentLeader.readInt32(),
-                        leaderEpoch: currentLeader.readInt32(),
-                        tags: currentLeader.readTagBuffer(),
+    response: async (decoder) =>
+        throwIfError(
+            await withDecompressions((decompressions) => ({
+                throttleTimeMs: decoder.readInt32(),
+                errorCode: decoder.readInt16(),
+                errorMessage: decoder.readCompactString(),
+                acquisitionLockTimeoutMs: decoder.readInt32(),
+                responses: decoder.readCompactArray((response) => ({
+                    topicId: response.readUUID(),
+                    partitions: response.readCompactArray((partition) => ({
+                        partitionIndex: partition.readInt32(),
+                        errorCode: partition.readInt16(),
+                        errorMessage: partition.readCompactString(),
+                        acknowledgeErrorCode: partition.readInt16(),
+                        acknowledgeErrorMessage: partition.readCompactString(),
+                        currentLeader: partition.readStruct((currentLeader) => ({
+                            leaderId: currentLeader.readInt32(),
+                            leaderEpoch: currentLeader.readInt32(),
+                            tags: currentLeader.readTagBuffer(),
+                        })),
+                        records: decodeRecordBatch(partition, partition.readUVarInt() - 1, decompressions),
+                        acquiredRecords: partition.readCompactArray((acquiredRecord) => ({
+                            firstOffset: acquiredRecord.readInt64(),
+                            lastOffset: acquiredRecord.readInt64(),
+                            deliveryCount: acquiredRecord.readInt16(),
+                            tags: acquiredRecord.readTagBuffer(),
+                        })),
+                        tags: partition.readTagBuffer(),
                     })),
-                    records: decodeRecordBatch(partition, partition.readUVarInt() - 1),
-                    acquiredRecords: partition.readCompactArray((acquiredRecord) => ({
-                        firstOffset: acquiredRecord.readInt64(),
-                        lastOffset: acquiredRecord.readInt64(),
-                        deliveryCount: acquiredRecord.readInt16(),
-                        tags: acquiredRecord.readTagBuffer(),
-                    })),
-                    tags: partition.readTagBuffer(),
+                    tags: response.readTagBuffer(),
                 })),
-                tags: response.readTagBuffer(),
+                nodeEndpoints: decoder.readCompactArray((nodeEndpoint) => ({
+                    nodeId: nodeEndpoint.readInt32(),
+                    host: nodeEndpoint.readCompactString()!,
+                    port: nodeEndpoint.readInt32(),
+                    rack: nodeEndpoint.readCompactString(),
+                    tags: nodeEndpoint.readTagBuffer(),
+                })),
+                tags: decoder.readTagBuffer(),
             })),
-            nodeEndpoints: decoder.readCompactArray((nodeEndpoint) => ({
-                nodeId: nodeEndpoint.readInt32(),
-                host: nodeEndpoint.readCompactString()!,
-                port: nodeEndpoint.readInt32(),
-                rack: nodeEndpoint.readCompactString(),
-                tags: nodeEndpoint.readTagBuffer(),
-            })),
-            tags: decoder.readTagBuffer(),
-        }),
+        ),
 });
