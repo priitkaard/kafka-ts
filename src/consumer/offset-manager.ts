@@ -17,7 +17,7 @@ type OffsetManagerOptions = {
 
 export class OffsetManager {
     private currentOffsets: Record<string, Record<number, bigint>> = {};
-    public pendingOffsets: Record<string, Record<number, bigint>> = {};
+    private pendingOffsets: Record<string, Record<number, bigint>> = {};
 
     constructor(private options: OffsetManagerOptions) {}
 
@@ -32,6 +32,28 @@ export class OffsetManager {
     public resolve(topic: string, partition: number, offset: bigint) {
         this.pendingOffsets[topic] ??= {};
         this.pendingOffsets[topic][partition] = offset;
+    }
+
+    public getPosition(topic: string, partition: number) {
+        return this.pendingOffsets[topic]?.[partition] ?? this.getCurrentOffset(topic, partition);
+    }
+
+    public getPendingOffsets() {
+        return Object.entries(this.options.metadata.getAssignment()).flatMap(([topic, partitions]) =>
+            partitions
+                .filter((partition) => this.pendingOffsets[topic]?.[partition] !== undefined)
+                .map((partition) => ({ topic, partition, offset: this.pendingOffsets[topic][partition] })),
+        );
+    }
+
+    public markCommitted(offsets: { topic: string; partition: number; offset: bigint }[]) {
+        offsets.forEach(({ topic, partition, offset }) => {
+            this.currentOffsets[topic] ??= {};
+            this.currentOffsets[topic][partition] = offset;
+            if (this.pendingOffsets[topic]?.[partition] === offset) {
+                delete this.pendingOffsets[topic][partition];
+            }
+        });
     }
 
     public isResolved(message: { topic: string; partition: number; offset: bigint }) {

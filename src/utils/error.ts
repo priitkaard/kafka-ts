@@ -44,3 +44,5 @@ export class UnknownPartitionError extends KafkaTSError {
         super(`Partition ${partition} does not exist on topic "${topic}"`);
     }
 }
+
+export class StaleMetadataError extends KafkaTSError {}

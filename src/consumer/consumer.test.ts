@@ -56,16 +56,18 @@ describe('Consumer', () => {
 
     it('advances offsets for a consumer without a group', async () => {
         const consumer = new Consumer(createCluster(), { topics: ['topic'], onBatch: () => {} });
-        const flush = vi.fn();
+        const markCommitted = vi.fn();
         (consumer as any).offsetManager = {
             resolve: () => {},
             isResolved: () => false,
-            flush,
+            getPendingOffsets: () => [],
+            markCommitted,
         };
 
         await (consumer as any).process(fetchResponse());
+        await (consumer as any).committing;
 
-        expect(flush).toHaveBeenCalled();
+        expect(markCommitted).toHaveBeenCalled();
     });
 
     it('stops running when the fetch loop fails while recovering', async () => {
@@ -85,6 +87,32 @@ describe('Consumer', () => {
         await (consumer as any).startFetchManager();
 
         expect((consumer as any).running).toBe(false);
+    });
+
+    it('refreshes metadata without rejoining when a fetch connection fails', async () => {
+        const cluster = createCluster();
+        cluster.sendRequestToNode = () => async () => {
+            throw new ConnectionError('Socket closed unexpectedly');
+        };
+        const consumer = new Consumer(cluster, { topics: ['topic'], groupId: 'group', onBatch: () => {} });
+        const join = vi.fn(async () => {});
+        const fetchMetadata = vi.fn(async () => {
+            if (fetchMetadata.mock.calls.length === 2) (consumer as any).stopRequested = true;
+        });
+
+        (consumer as any).consumerGroup = { join, handleLastHeartbeat: () => {} };
+        (consumer as any).metadata = {
+            getAssignment: () => ({ topic: [0] }),
+            getTopicPartitionLeaderIds: () => ({ topic: { 0: 1 } }),
+            getTopicIdByName: () => '',
+        };
+        (consumer as any).offsetManager = { getPosition: () => 0n };
+        (consumer as any).fetchMetadata = fetchMetadata;
+
+        await (consumer as any).runFetchManager();
+
+        expect(join).toHaveBeenCalledOnce();
+        expect(fetchMetadata).toHaveBeenCalledTimes(2);
     });
 
     it('closes when the group reports the instance id was fenced', async () => {

@@ -71,7 +71,7 @@ export class ConsumerGroup {
             } finally {
                 isHeartbeating = false;
             }
-        }, 5000);
+        }, this.options.sessionTimeoutMs / 10);
         this.heartbeatInterval = heartbeatInterval;
     }
 
@@ -205,33 +205,30 @@ export class ConsumerGroup {
         });
     }
 
-    public async offsetCommit(topicPartitions: Record<string, Set<number>>): Promise<void> {
+    public async offsetCommit(offsets: { topic: string; partition: number; offset: bigint }[]): Promise<void> {
+        if (!offsets.length) return;
+
         return withRetry(this.handleError.bind(this))(async () => {
-            const { cluster, groupId, groupInstanceId, metadata, offsetManager, consumer } = this.options;
-            const request = {
+            const { cluster, groupId, groupInstanceId, metadata, consumer } = this.options;
+            const topics = [...new Set(offsets.map(({ topic }) => topic))];
+            await cluster.sendRequest(API.OFFSET_COMMIT, {
                 groupId,
                 groupInstanceId,
                 memberId: this.memberId,
                 generationIdOrMemberEpoch: this.generationId,
-                topics: Object.entries(topicPartitions)
-                    .filter(([topic]) => topic in offsetManager.pendingOffsets)
-                    .map(([topic, partitions]) => ({
-                        name: topic,
-                        topicId: metadata.getTopicIdByName(topic),
-                        partitions: [...partitions]
-                            .filter((partition) => partition in offsetManager.pendingOffsets[topic])
-                            .map((partitionIndex) => ({
-                                partitionIndex,
-                                committedOffset: offsetManager.pendingOffsets[topic][partitionIndex],
-                                committedLeaderEpoch: -1,
-                                committedMetadata: null,
-                            })),
-                    })),
-            };
-            if (!request.topics.length) {
-                return;
-            }
-            await cluster.sendRequest(API.OFFSET_COMMIT, request);
+                topics: topics.map((topic) => ({
+                    name: topic,
+                    topicId: metadata.getTopicIdByName(topic),
+                    partitions: offsets
+                        .filter((offset) => offset.topic === topic)
+                        .map(({ partition, offset }) => ({
+                            partitionIndex: partition,
+                            committedOffset: offset,
+                            committedLeaderEpoch: -1,
+                            committedMetadata: null,
+                        })),
+                })),
+            });
             consumer.emit('offsetCommit');
         });
     }

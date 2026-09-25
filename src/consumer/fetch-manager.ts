@@ -6,7 +6,7 @@ import { Fetcher } from './fetcher';
 const trace = createTracer('FetchManager');
 
 type FetchManagerOptions = {
-    fetch: (nodeId: number, assignment: Assignment) => Promise<FetchResponse>;
+    fetch: (nodeId: number, assignment: Assignment, previous?: FetchResponse) => Promise<FetchResponse>;
     process: (response: FetchResponse) => Promise<void>;
     nodeAssignments: { nodeId: number; assignment: Assignment }[];
 };

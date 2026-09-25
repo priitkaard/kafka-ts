@@ -186,7 +186,7 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 | rebalanceTimeoutMs     | number                                 | false    | 60000                           | Rebalance timeout in milliseconds                                                    |
 | maxWaitMs              | number                                 | false    | 5000                            | Fetch long poll timeout in milliseconds. Must be lower than `requestTimeout`.        |
 | minBytes               | number                                 | false    | 1                               | Minimum number of bytes to wait for before returning a fetch response                |
-| maxBytes               | number                                 | false    | 1_048_576                       | Maximum number of bytes to return in the fetch response                              |
+| maxBytes               | number                                 | false    | 52_428_800                      | Maximum number of bytes to return in the fetch response                              |
 | partitionMaxBytes      | number                                 | false    | 1_048_576                       | Maximum number of bytes to return per partition in the fetch response                |
 | allowTopicAutoCreation | boolean                                | false    | false                           | Allow kafka to auto-create topic when it doesn't exist                               |
 | fromTimestamp          | bigint                                 | false    | -1                              | Start consuming messages from timestamp (-1 = latest offsets, -2 = earliest offsets) |

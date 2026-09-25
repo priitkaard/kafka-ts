@@ -7,7 +7,7 @@ import { groupByLeaderId } from '../distributors/group-by-leader-id';
 import { groupPartitionsByTopic } from '../distributors/group-partitions-by-topic';
 import { Message } from '../types';
 import { delay } from '../utils/delay';
-import { ConnectionError, getErrorMessage, KafkaTSApiError } from '../utils/error';
+import { ConnectionError, getErrorMessage, KafkaTSApiError, StaleMetadataError } from '../utils/error';
 import { log } from '../utils/logger';
 import { defaultRetrier, Retrier } from '../utils/retrier';
 import { withRetry } from '../utils/retry';
@@ -54,6 +54,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
     private stopHooks: (() => void)[] = [];
     private running = false;
     private closed = false;
+    private committing = Promise.resolve();
 
     constructor(
         private cluster: Cluster,
@@ -70,7 +71,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
             rebalanceTimeoutMs: options.rebalanceTimeoutMs ?? 60_000,
             maxWaitMs: options.maxWaitMs ?? 5000,
             minBytes: options.minBytes ?? 1,
-            maxBytes: options.maxBytes ?? 1_048_576,
+            maxBytes: options.maxBytes ?? 52_428_800,
             partitionMaxBytes: options.partitionMaxBytes ?? 1_048_576,
             isolationLevel: options.isolationLevel ?? IsolationLevel.READ_COMMITTED,
             allowTopicAutoCreation: options.allowTopicAutoCreation ?? false,
@@ -100,6 +101,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
             : undefined;
 
         this.setMaxListeners(Infinity);
+        this.on('rebalanceInProgress', () => void this.fetchManager?.stop());
     }
 
     @trace()
@@ -167,6 +169,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
 
             await this.fetchManager?.stop();
             await drained;
+            await this.committing;
         }
         await this.consumerGroup
             ?.leaveGroup()
@@ -187,10 +190,15 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
 
     private async runFetchManager() {
         const { groupId } = this.options;
+        let rejoin = true;
 
         while (!this.stopRequested) {
             try {
-                await this.consumerGroup?.join();
+                if (rejoin) {
+                    await this.committing;
+                    await this.consumerGroup?.join();
+                }
+                rejoin = true;
                 if (this.stopRequested) break;
 
                 // TODO: If leader is not available, find another read replica
@@ -222,6 +230,13 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
             } catch (error) {
                 await this.fetchManager?.stop();
 
+                if (error instanceof StaleMetadataError) {
+                    log.debug(`${error.message}. Refreshing metadata...`);
+                    await delay(100);
+                    await this.fetchMetadata();
+                    rejoin = false;
+                    continue;
+                }
                 if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
                     log.debug('Rebalance in progress...', { apiName: error.apiName, groupId });
                     continue;
@@ -269,16 +284,11 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
 
         this.consumerGroup?.handleLastHeartbeat();
 
-        const topicPartitions: Record<string, Set<number>> = {};
         const messages = response.responses.flatMap((response) => {
-            const topic =
-                'topicName' in response ? response.topicName : this.metadata.getTopicNameById(response.topicId);
-            topicPartitions[topic] ??= new Set();
-
-            return response.partitions.flatMap(({ partitionIndex, records }) => {
-                topicPartitions[topic].add(partitionIndex);
-                return records.flatMap(({ baseTimestamp, baseOffset, records }) =>
-                    records.flatMap((message): Required<Message> => ({
+            const topic = this.getTopicName(response);
+            return response.partitions.flatMap(({ partitionIndex, records }) =>
+                records.flatMap(({ baseTimestamp, baseOffset, records }) =>
+                    records.map((message): Required<Message> => ({
                         topic,
                         partition: partitionIndex,
                         key: message.key ?? null,
@@ -287,29 +297,18 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                         timestamp: baseTimestamp + BigInt(message.timestampDelta),
                         offset: baseOffset + BigInt(message.offsetDelta),
                     })),
-                );
-            });
+                ),
+            );
         });
         if (!messages.length) {
             return;
         }
 
-        const commitOffset = async () => {
-            await this.consumerGroup?.offsetCommit(topicPartitions);
-            this.offsetManager.flush(topicPartitions);
-        };
-
-        const commitOffsetSafely = () =>
-            commitOffset().catch((error) => log.debug('Failed to commit offsets', { reason: getErrorMessage(error) }));
-
         const resolveOffset = (message: Pick<Required<Message>, 'topic' | 'partition' | 'offset'>) =>
             this.offsetManager.resolve(message.topic, message.partition, message.offset + 1n);
 
         const abortController = new AbortController();
-        const onRebalance = () => {
-            abortController.abort();
-            void commitOffsetSafely();
-        };
+        const onRebalance = () => abortController.abort();
         this.once('rebalanceInProgress', onRebalance);
 
         try {
@@ -320,36 +319,72 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                 ),
             );
         } catch (error) {
-            await commitOffsetSafely();
+            await this.commitOffsets();
             throw error;
         } finally {
             this.off('rebalanceInProgress', onRebalance);
         }
 
         if (!abortController.signal.aborted) {
-            response.responses.forEach((response) => {
-                response.partitions.forEach(({ partitionIndex, records }) => {
-                    records.forEach(({ baseOffset, lastOffsetDelta }) => {
-                        const topic =
-                            'topicName' in response
-                                ? response.topicName
-                                : this.metadata.getTopicNameById(response.topicId);
-                        this.offsetManager.resolve(topic, partitionIndex, baseOffset + BigInt(lastOffsetDelta) + 1n);
-                    });
-                });
-            });
+            Object.entries(this.getNextOffsets(response)).forEach(([topic, partitions]) =>
+                Object.entries(partitions).forEach(([partition, offset]) =>
+                    this.offsetManager.resolve(topic, Number(partition), offset),
+                ),
+            );
         }
 
-        await commitOffset();
+        void this.commitOffsets();
     }
 
-    private async fetch(nodeId: number, assignment: Assignment): Promise<FetchResponse> {
-        return withRetry(this.handleError.bind(this))(async () => {
-            const { rackId, maxWaitMs, minBytes, maxBytes, partitionMaxBytes, isolationLevel } = this.options;
+    private commitOffsets() {
+        this.committing = this.committing
+            .then(async () => {
+                const offsets = this.offsetManager.getPendingOffsets();
+                await this.consumerGroup?.offsetCommit(offsets);
+                this.offsetManager.markCommitted(offsets);
+            })
+            .catch((error) => log.debug('Failed to commit offsets', { reason: getErrorMessage(error) }));
+        return this.committing;
+    }
 
-            this.consumerGroup?.handleLastHeartbeat();
+    private getNextOffsets(response: FetchResponse) {
+        const offsets: Record<string, Record<number, bigint>> = {};
+        response.responses.forEach((response) => {
+            const topic = this.getTopicName(response);
+            response.partitions.forEach(({ partitionIndex, records }) => {
+                const lastBatch = records.at(-1);
+                if (!lastBatch) return;
 
-            return this.cluster.sendRequestToNode(nodeId)(API.FETCH, {
+                offsets[topic] ??= {};
+                offsets[topic][partitionIndex] = lastBatch.baseOffset + BigInt(lastBatch.lastOffsetDelta) + 1n;
+            });
+        });
+        return offsets;
+    }
+
+    private getTopicName(response: FetchResponse['responses'][number]) {
+        return 'topicName' in response ? response.topicName : this.metadata.getTopicNameById(response.topicId);
+    }
+
+    private async fetch(nodeId: number, assignment: Assignment, previous?: FetchResponse): Promise<FetchResponse> {
+        const { rackId, maxWaitMs, minBytes, maxBytes, partitionMaxBytes, isolationLevel } = this.options;
+        let nextOffsets = previous ? this.getNextOffsets(previous) : {};
+
+        this.consumerGroup?.handleLastHeartbeat();
+
+        const handleError = async (error: unknown) => {
+            if (
+                error instanceof ConnectionError ||
+                (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_LEADER_OR_FOLLOWER)
+            ) {
+                throw new StaleMetadataError(getErrorMessage(error));
+            }
+            await this.handleError(error);
+            nextOffsets = {};
+        };
+
+        return withRetry(handleError)(() =>
+            this.cluster.sendRequestToNode(nodeId)(API.FETCH, {
                 maxWaitMs,
                 minBytes,
                 maxBytes,
@@ -362,7 +397,8 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                     partitions: partitions.map((partition) => ({
                         partition,
                         currentLeaderEpoch: -1,
-                        fetchOffset: this.offsetManager.getCurrentOffset(topicName, partition),
+                        fetchOffset:
+                            nextOffsets[topicName]?.[partition] ?? this.offsetManager.getPosition(topicName, partition),
                         lastFetchedEpoch: -1,
                         logStartOffset: -1n,
                         partitionMaxBytes,
@@ -370,8 +406,8 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                 })),
                 forgottenTopicsData: [],
                 rackId,
-            });
-        });
+            }),
+        );
     }
 
     private async fetchMetadata() {
