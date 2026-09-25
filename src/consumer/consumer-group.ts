@@ -65,6 +65,7 @@ export class ConsumerGroup {
                 if (this.heartbeatInterval !== heartbeatInterval) return;
 
                 this.heartbeatError = error as KafkaTSError;
+                this.options.consumer.emit('heartbeatError', this.heartbeatError);
                 if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
                     this.options.consumer.emit('rebalanceInProgress');
                 }
@@ -273,6 +274,9 @@ export class ConsumerGroup {
             if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.MEMBER_ID_REQUIRED) {
                 this.memberId = error.response.memberId;
                 return;
+            }
+            if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.UNKNOWN_MEMBER_ID) {
+                this.memberId = '';
             }
             throw error;
         });

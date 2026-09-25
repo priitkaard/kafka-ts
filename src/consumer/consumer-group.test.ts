@@ -52,7 +52,7 @@ describe('ConsumerGroup heartbeater', () => {
         rejecters[0](new KafkaTSApiError(API_ERROR.REBALANCE_IN_PROGRESS, null, {}));
         await vi.advanceTimersByTimeAsync(0);
 
-        expect(emit).toHaveBeenCalledExactlyOnceWith('rebalanceInProgress');
+        expect(emit.mock.calls.filter(([event]) => event === 'rebalanceInProgress')).toHaveLength(1);
         stop();
     });
 
@@ -118,5 +118,21 @@ describe('ConsumerGroup heartbeater', () => {
 
         expect(() => group.handleLastHeartbeat()).toThrow('current generation');
         stop();
+    });
+});
+
+describe('ConsumerGroup', () => {
+    it('forgets its member id when the coordinator no longer knows it', async () => {
+        const cluster = {
+            sendRequest: async () => {
+                throw new KafkaTSApiError(API_ERROR.UNKNOWN_MEMBER_ID, null, {});
+            },
+        };
+        const group = new ConsumerGroup({ cluster, topics: [], sessionTimeoutMs: 30_000 } as never);
+        (group as any).memberId = 'expired-member';
+
+        await expect((group as any).joinGroup()).rejects.toThrow(/UNKNOWN_MEMBER_ID/);
+
+        expect((group as any).memberId).toBe('');
     });
 });

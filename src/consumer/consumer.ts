@@ -7,7 +7,7 @@ import { groupByLeaderId } from '../distributors/group-by-leader-id';
 import { groupPartitionsByTopic } from '../distributors/group-partitions-by-topic';
 import { Message } from '../types';
 import { delay } from '../utils/delay';
-import { ConnectionError, getErrorMessage, KafkaTSApiError, StaleMetadataError } from '../utils/error';
+import { ConnectionError, getErrorMessage, KafkaTSApiError, KafkaTSError, StaleMetadataError } from '../utils/error';
 import { log } from '../utils/logger';
 import { defaultRetrier, Retrier } from '../utils/retrier';
 import { withRetry } from '../utils/retry';
@@ -18,6 +18,12 @@ import { FetchManager } from './fetch-manager';
 import { OffsetManager } from './offset-manager';
 
 const trace = createTracer('Consumer');
+
+const REJOIN_ERROR_CODES: number[] = [
+    API_ERROR.REBALANCE_IN_PROGRESS,
+    API_ERROR.ILLEGAL_GENERATION,
+    API_ERROR.UNKNOWN_MEMBER_ID,
+];
 
 export type ConsumerOptions = {
     topics: string[];
@@ -44,7 +50,12 @@ export type ConsumerOptions = {
     ) => unknown;
 };
 
-export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; rebalanceInProgress: [] }> {
+export class Consumer extends EventEmitter<{
+    offsetCommit: [];
+    heartbeat: [];
+    heartbeatError: [KafkaTSError];
+    rebalanceInProgress: [];
+}> {
     private options: Required<ConsumerOptions>;
     private metadata: ConsumerMetadata;
     private consumerGroup: ConsumerGroup | undefined;
@@ -101,7 +112,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
             : undefined;
 
         this.setMaxListeners(Infinity);
-        this.on('rebalanceInProgress', () => void this.fetchManager?.stop());
+        this.on('heartbeatError', () => void this.fetchManager?.stop());
     }
 
     @trace()
@@ -223,11 +234,11 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                     nodeAssignments,
                 });
                 await this.fetchManager.start();
+                this.consumerGroup?.handleLastHeartbeat();
 
                 if (!nodeAssignments.length) {
                     await this.waitForReassignment();
                 }
-                joined = false;
             } catch (error) {
                 await this.fetchManager?.stop();
 
@@ -237,8 +248,8 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                     await this.fetchMetadata();
                     continue;
                 }
-                if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
-                    log.debug('Rebalance in progress...', { apiName: error.apiName, groupId });
+                if (error instanceof KafkaTSApiError && REJOIN_ERROR_CODES.includes(error.errorCode)) {
+                    log.debug(`${error.message}. Rejoining group...`, { apiName: error.apiName, groupId });
                     joined = false;
                     continue;
                 }

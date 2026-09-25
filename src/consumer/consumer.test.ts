@@ -252,6 +252,38 @@ describe('Consumer', () => {
         expect(join).toHaveBeenCalledOnce();
     });
 
+    it('stops fetching as soon as a heartbeat fails', () => {
+        const consumer = new Consumer(createCluster(), { topics: ['topic'], groupId: 'group', onBatch: () => {} });
+        const stop = vi.fn(async () => {});
+        (consumer as any).fetchManager = { stop };
+
+        consumer.emit('heartbeatError', new ConnectionError('Socket closed unexpectedly'));
+
+        expect(stop).toHaveBeenCalledOnce();
+    });
+
+    it.each([API_ERROR.ILLEGAL_GENERATION, API_ERROR.UNKNOWN_MEMBER_ID])(
+        'rejoins the group when a heartbeat fails with error code %s',
+        async (errorCode) => {
+            const consumer = new Consumer(createCluster(), { topics: ['topic'], groupId: 'group', onBatch: () => {} });
+            const handleLastHeartbeat = vi.fn(() => {
+                if (handleLastHeartbeat.mock.calls.length === 1) throw new KafkaTSApiError(errorCode, null, {});
+                (consumer as any).stopRequested = true;
+            });
+            const join = vi.fn(async () => {});
+            const restart = vi.fn(async () => {});
+
+            (consumer as any).consumerGroup = { join, handleLastHeartbeat };
+            (consumer as any).metadata = { getAssignment: () => ({}), getTopicPartitionLeaderIds: () => ({}) };
+            (consumer as any).restart = restart;
+
+            await (consumer as any).runFetchManager();
+
+            expect(join).toHaveBeenCalledTimes(2);
+            expect(restart).not.toHaveBeenCalled();
+        },
+    );
+
     it('closes when the group reports the instance id was fenced', async () => {
         const consumer = new Consumer(createCluster(), { topics: ['topic'], groupId: 'group', onBatch: () => {} });
 
