@@ -175,9 +175,9 @@ export class Decoder {
             const size = this.readVarInt();
             if (!size) continue;
 
-            const child = new Decoder(this.buffer.subarray(this.offset, this.offset + size));
-            this.offset += size;
-            results.push(callback(child));
+            const end = this.offset + size;
+            results.push(callback(this));
+            this.offset = end;
         }
         return results;
     }

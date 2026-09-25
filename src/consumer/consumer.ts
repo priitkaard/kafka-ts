@@ -19,6 +19,12 @@ import { OffsetManager } from './offset-manager';
 
 const trace = createTracer('Consumer');
 
+const toHeaders = (headers: { key: string; value: string }[]) => {
+    const result: Record<string, string> = {};
+    for (const { key, value } of headers) result[key] = value;
+    return result;
+};
+
 const REJOIN_ERROR_CODES: number[] = [
     API_ERROR.REBALANCE_IN_PROGRESS,
     API_ERROR.ILLEGAL_GENERATION,
@@ -306,7 +312,7 @@ export class Consumer extends EventEmitter<{
                         partition: partition.partitionIndex,
                         key: message.key ?? null,
                         value: message.value ?? null,
-                        headers: Object.fromEntries(message.headers.map(({ key, value }) => [key, value])),
+                        headers: toHeaders(message.headers),
                         timestamp: baseTimestamp + BigInt(message.timestampDelta),
                         offset: baseOffset + BigInt(message.offsetDelta),
                     })),
