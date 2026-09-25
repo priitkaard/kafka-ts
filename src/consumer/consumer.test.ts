@@ -25,6 +25,7 @@ const fetchResponse = () => ({
             partitions: [
                 {
                     partitionIndex: 0,
+                    abortedTransactions: [],
                     records: [
                         {
                             baseTimestamp: 0n,
@@ -68,6 +69,71 @@ describe('Consumer', () => {
         await (consumer as any).committing;
 
         expect(markCommitted).toHaveBeenCalled();
+    });
+
+    it('skips control batches and aborted transactions', async () => {
+        const batch = (baseOffset: bigint, producerId: bigint, value: string | null, isControlBatch = false) => ({
+            baseOffset,
+            baseTimestamp: 0n,
+            lastOffsetDelta: 0,
+            producerId,
+            isTransactional: true,
+            isControlBatch,
+            records: [{ key: null, value, headers: [], timestampDelta: 0, offsetDelta: 0 }],
+        });
+        const response = {
+            responses: [
+                {
+                    topicName: 'topic',
+                    partitions: [
+                        {
+                            partitionIndex: 0,
+                            abortedTransactions: [{ producerId: 1n, firstOffset: 1n }],
+                            records: [
+                                batch(0n, 2n, 'committed'),
+                                batch(1n, 1n, 'aborted'),
+                                batch(2n, 1n, null, true),
+                                batch(3n, 1n, 'next transaction'),
+                                batch(4n, 1n, null, true),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+        const values: (string | null)[] = [];
+        const consumer = new Consumer(createCluster(), {
+            topics: ['topic'],
+            onBatch: (messages) => values.push(...messages.map(({ value }) => value)),
+        });
+        const resolve = vi.fn();
+        (consumer as any).offsetManager = {
+            resolve,
+            isResolved: () => false,
+            getPendingOffsets: () => [],
+            markCommitted: () => {},
+        };
+
+        await (consumer as any).process(response);
+
+        expect(values).toEqual(['committed', 'next transaction']);
+        expect(resolve).toHaveBeenLastCalledWith('topic', 0, 5n);
+    });
+
+    it('advances past a response that only contains control batches', async () => {
+        const consumer = new Consumer(createCluster(), { topics: ['topic'], onBatch: () => {} });
+        const resolve = vi.fn();
+        (consumer as any).offsetManager = {
+            resolve,
+            getPendingOffsets: () => [],
+            markCommitted: () => {},
+        };
+        const response = fetchResponse();
+        Object.assign(response.responses[0].partitions[0].records[0], { isControlBatch: true });
+
+        await (consumer as any).process(response);
+
+        expect(resolve).toHaveBeenCalledExactlyOnceWith('topic', 0, 1n);
     });
 
     it('stops running when the fetch loop fails while recovering', async () => {

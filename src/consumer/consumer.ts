@@ -286,11 +286,11 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
 
         const messages = response.responses.flatMap((response) => {
             const topic = this.getTopicName(response);
-            return response.partitions.flatMap(({ partitionIndex, records }) =>
-                records.flatMap(({ baseTimestamp, baseOffset, records }) =>
+            return response.partitions.flatMap((partition) =>
+                this.getConsumableBatches(partition).flatMap(({ baseTimestamp, baseOffset, records }) =>
                     records.map((message): Required<Message> => ({
                         topic,
-                        partition: partitionIndex,
+                        partition: partition.partitionIndex,
                         key: message.key ?? null,
                         value: message.value ?? null,
                         headers: Object.fromEntries(message.headers.map(({ key, value }) => [key, value])),
@@ -301,6 +301,8 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
             );
         });
         if (!messages.length) {
+            this.resolveNextOffsets(response);
+            void this.commitOffsets();
             return;
         }
 
@@ -326,11 +328,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
         }
 
         if (!abortController.signal.aborted) {
-            Object.entries(this.getNextOffsets(response)).forEach(([topic, partitions]) =>
-                Object.entries(partitions).forEach(([partition, offset]) =>
-                    this.offsetManager.resolve(topic, Number(partition), offset),
-                ),
-            );
+            this.resolveNextOffsets(response);
         }
 
         void this.commitOffsets();
@@ -345,6 +343,34 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
             })
             .catch((error) => log.debug('Failed to commit offsets', { reason: getErrorMessage(error) }));
         return this.committing;
+    }
+
+    private getConsumableBatches({
+        records,
+        abortedTransactions,
+    }: FetchResponse['responses'][number]['partitions'][number]) {
+        const pendingAborts = abortedTransactions.toSorted((a, b) => (a.firstOffset < b.firstOffset ? -1 : 1));
+        const abortedProducerIds = new Set<bigint>();
+
+        return records.filter((batch) => {
+            const lastOffset = batch.baseOffset + BigInt(batch.lastOffsetDelta);
+            while (pendingAborts.length && pendingAborts[0].firstOffset <= lastOffset) {
+                abortedProducerIds.add(pendingAborts.shift()!.producerId);
+            }
+            if (batch.isControlBatch) {
+                abortedProducerIds.delete(batch.producerId);
+                return false;
+            }
+            return !(batch.isTransactional && abortedProducerIds.has(batch.producerId));
+        });
+    }
+
+    private resolveNextOffsets(response: FetchResponse) {
+        Object.entries(this.getNextOffsets(response)).forEach(([topic, partitions]) =>
+            Object.entries(partitions).forEach(([partition, offset]) =>
+                this.offsetManager.resolve(topic, Number(partition), offset),
+            ),
+        );
     }
 
     private getNextOffsets(response: FetchResponse) {
