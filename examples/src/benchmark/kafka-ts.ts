@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import { API, createKafkaClient, saslScramSha512 } from 'kafka-ts';
+import { API, createKafkaClient, saslPlain } from 'kafka-ts';
 import { startBenchmarker } from './common';
 
 // setTracer(new OpenTelemetryTracer());
@@ -7,7 +7,7 @@ import { startBenchmarker } from './common';
 const kafka = createKafkaClient({
     bootstrapServers: [{ host: 'localhost', port: 39092 }],
     clientId: 'kafka-ts',
-    sasl: saslScramSha512({ username: 'admin', password: 'admin' }),
+    sasl: saslPlain({ username: 'admin', password: 'admin' }),
     ssl: { ca: readFileSync('../certs/ca.crt').toString() },
 });
 
@@ -26,10 +26,11 @@ startBenchmarker({
         await cluster.disconnect();
     },
     connectProducer: async () => () => producer.close(),
-    startConsumer: async ({ groupId, topic, incrementCount }, callback) => {
+    startConsumer: async ({ groupId, topic, fromBeginning, incrementCount }, callback) => {
         const consumer = await kafka.startConsumer({
             groupId,
             topics: [topic],
+            fromBeginning,
             onBatch: async (messages) => {
                 for (const message of messages) {
                     callback(parseInt(message.timestamp.toString()));
@@ -39,11 +40,11 @@ startBenchmarker({
         consumer.on('offsetCommit', () => incrementCount('OFFSET_COMMIT', 1));
         return () => consumer.close();
     },
-    produce: async ({ topic, length, timestamp, acks }) => {
+    produce: async ({ topic, length, value, timestamp }) => {
         await producer.send(
             Array.from({ length }).map(() => ({
                 topic: topic,
-                value: 'hello',
+                value,
                 timestamp: BigInt(timestamp),
             })),
         );

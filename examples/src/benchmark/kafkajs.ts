@@ -22,10 +22,10 @@ startBenchmarker({
         await producer.connect();
         return () => producer.disconnect();
     },
-    startConsumer: async ({ groupId, topic, concurrency, incrementCount }, callback) => {
+    startConsumer: async ({ groupId, topic, concurrency, fromBeginning, incrementCount }, callback) => {
         const consumer = kafkajs.consumer({ groupId, allowAutoTopicCreation: false });
         await consumer.connect();
-        await consumer.subscribe({ topic });
+        await consumer.subscribe({ topic, fromBeginning });
         await consumer.run({
             eachBatch: async ({ batch }) => {
                 for (const message of batch.messages) {
@@ -38,11 +38,11 @@ startBenchmarker({
         consumer.on(consumer.events.COMMIT_OFFSETS, () => incrementCount('OFFSET_COMMIT', 1));
         return () => consumer.disconnect();
     },
-    produce: async ({ topic, length, timestamp, acks }) => {
+    produce: async ({ topic, length, value, timestamp, acks }) => {
         await producer.send({
             topic,
             messages: Array.from({ length }).map(() => ({
-                value: 'hello',
+                value,
                 timestamp: timestamp.toString(),
             })),
             acks,

@@ -28,7 +28,12 @@ process.once('SIGINT', () => {
 const tracer = trace.getTracer('kafka-ts');
 
 export class OpenTelemetryTracer implements Tracer {
-    startActiveSpan(module, method, { body, ...metadata } = {} as any, callback) {
+    startActiveSpan<T>(
+        module: string,
+        method: string,
+        { body, ...metadata }: Record<string, any> = {},
+        callback: () => T,
+    ): T {
         return tracer.startActiveSpan(
             `${module}.${method} ${metadata?.message ?? ''}`,
             { attributes: metadata },
@@ -36,7 +41,7 @@ export class OpenTelemetryTracer implements Tracer {
             (span) => {
                 const result = callback();
                 if (result instanceof Promise) {
-                    return result.finally(() => span.end());
+                    return result.finally(() => span.end()) as T;
                 }
                 span.end();
                 return result;

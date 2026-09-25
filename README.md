@@ -151,6 +151,30 @@ The existing high-level libraries (e.g. kafkajs) are missing a few crucial featu
 - **Consuming messages without consumer groups** - When you don't need the consumer to track the partition offsets, you can simply create a consumer without groupId and always either start consuming messages from the beginning or from the latest partition offset.
 - **Low-level API requests** - It's possible to communicate directly with the Kafka cluster using the kafka api protocol.
 
+## Benchmarks
+
+Compared with [kafkajs](https://github.com/tulios/kafkajs) and librdkafka (via [@confluentinc/kafka-javascript](https://github.com/confluentinc/confluent-kafka-javascript)). Median of 3 runs:
+
+|                             |  kafka-ts | kafkajs | librdkafka |
+| --------------------------- | --------: | ------: | ---------: |
+| Consume throughput (msg/s)  | 1,692,047 | 589,623 |    241,488 |
+| Produce throughput (msg/s)  |   214,500 | 151,100 |     76,650 |
+| End-to-end latency avg (ms) |         6 |     107 |         11 |
+| End-to-end latency p99 (ms) |        20 |     182 |         20 |
+
+- **Consume throughput** - time to consume a backlog of 1,000,000 messages, from the first message to the last.
+- **Produce throughput** - awaited sends of 1,000 messages at a time for 20 seconds.
+- **End-to-end latency** - time from send to consume while producing 10 messages every 10ms.
+
+Why the others are slower:
+
+- **kafkajs** commits offsets after every batch (the default `autoCommit`) and waits for the commit before fetching again. It also doesn't fetch the next batch while the current one is being processed. At 1,000 messages/s that is ~130 commits per second, which leaves each fetcher idle ~80ms between fetches.
+- **librdkafka** does its networking in native threads, but every message crosses into JavaScript individually: each produced message is a separate native call that resolves on its own delivery report, and consumed messages are pulled from librdkafka's queue and converted into JavaScript objects before reaching `eachBatch`. The producer also waits up to `linger.ms` (5ms by default) to batch messages.
+
+Setup: Apple M1 Max, Node.js 24.13, Kafka 4.0.0 with 3 brokers in Docker, SASL_SSL, 10 partitions, replication factor 3, `acks: -1`, 100-byte messages. kafka-ts 1.4.1, kafkajs 2.2.4, @confluentinc/kafka-javascript 1.10.1 (librdkafka 2.15.1) using its KafkaJS-compatible API with `js.consumer.max.batch.size: -1`. All other settings are defaults.
+
+To run them yourself, start the local cluster with `npm run up`, then run `npm run build` and `cd examples && npm install && npm run benchmark`.
+
 ## Configuration
 
 ### `createKafkaClient()`
