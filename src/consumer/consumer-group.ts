@@ -12,7 +12,7 @@ import { OffsetManager } from './offset-manager';
 
 const trace = createTracer('ConsumerGroup');
 
-type ConsumerGroupOptions = {
+export type ConsumerGroupOptions = {
     cluster: Cluster;
     topics: string[];
     groupId: string;
@@ -25,16 +25,16 @@ type ConsumerGroupOptions = {
 };
 
 export class ConsumerGroup {
-    private coordinatorId = -1;
-    private memberId = '';
-    private generationId = -1;
+    protected coordinatorId = -1;
+    protected memberId = '';
+    protected generationId = -1;
     private leaderId = '';
     private skipAssignment = false;
     private memberIds: string[] = [];
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private heartbeatError: KafkaTSError | null = null;
 
-    constructor(private options: ConsumerGroupOptions) {}
+    constructor(protected options: ConsumerGroupOptions) {}
 
     @trace()
     public async init() {
@@ -50,7 +50,7 @@ export class ConsumerGroup {
         this.startHeartbeater();
     }
 
-    private async startHeartbeater() {
+    protected async startHeartbeater(intervalMs = this.options.sessionTimeoutMs / 10) {
         this.stopHeartbeater();
         this.heartbeatError = null;
 
@@ -72,11 +72,11 @@ export class ConsumerGroup {
             } finally {
                 isHeartbeating = false;
             }
-        }, this.options.sessionTimeoutMs / 10);
+        }, intervalMs);
         this.heartbeatInterval = heartbeatInterval;
     }
 
-    private async stopHeartbeater() {
+    protected async stopHeartbeater() {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
@@ -165,7 +165,7 @@ export class ConsumerGroup {
         });
     }
 
-    private async offsetFetch(): Promise<void> {
+    protected async offsetFetch(): Promise<void> {
         return withRetry(this.handleError.bind(this))(async () => {
             const { cluster, groupId, topics, metadata, offsetManager } = this.options;
 
@@ -264,7 +264,11 @@ export class ConsumerGroup {
         });
     }
 
-    private async handleError(error: unknown): Promise<void> {
+    protected resetMembership() {
+        this.memberId = '';
+    }
+
+    protected async handleError(error: unknown): Promise<void> {
         await handleApiError(error).catch(async (error) => {
             if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_COORDINATOR) {
                 log.debug('Not coordinator. Searching for new coordinator...');
@@ -276,7 +280,7 @@ export class ConsumerGroup {
                 return;
             }
             if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.UNKNOWN_MEMBER_ID) {
-                this.memberId = '';
+                this.resetMembership();
             }
             throw error;
         });

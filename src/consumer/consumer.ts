@@ -14,7 +14,9 @@ import { withRetry } from '../utils/retry';
 import { createTracer } from '../utils/tracer';
 import { ConsumerGroup } from './consumer-group';
 import { ConsumerMetadata } from './consumer-metadata';
+import { ConsumerProtocolGroup } from './consumer-protocol-group';
 import { FetchManager } from './fetch-manager';
+import { FetchSession } from './fetch-session';
 import { OffsetManager } from './offset-manager';
 
 const trace = createTracer('Consumer');
@@ -25,16 +27,24 @@ const toHeaders = (headers: { key: string; value: string }[]) => {
     return result;
 };
 
+const FETCH_SESSION_ERROR_CODES: number[] = [
+    API_ERROR.FETCH_SESSION_ID_NOT_FOUND,
+    API_ERROR.INVALID_FETCH_SESSION_EPOCH,
+    API_ERROR.FETCH_SESSION_TOPIC_ID_ERROR,
+];
+
 const REJOIN_ERROR_CODES: number[] = [
     API_ERROR.REBALANCE_IN_PROGRESS,
     API_ERROR.ILLEGAL_GENERATION,
     API_ERROR.UNKNOWN_MEMBER_ID,
+    API_ERROR.FENCED_MEMBER_EPOCH,
 ];
 
 export type ConsumerOptions = {
     topics: string[];
     groupId?: string | null;
     groupInstanceId?: string | null;
+    groupProtocol?: 'classic' | 'consumer';
     rackId?: string;
     isolationLevel?: IsolationLevel;
     sessionTimeoutMs?: number;
@@ -72,6 +82,7 @@ export class Consumer extends EventEmitter<{
     private running = false;
     private closed = false;
     private committing = Promise.resolve();
+    private fetchSessions: Record<number, FetchSession> = {};
 
     constructor(
         private cluster: Cluster,
@@ -83,6 +94,7 @@ export class Consumer extends EventEmitter<{
             ...options,
             groupId: options.groupId ?? null,
             groupInstanceId: options.groupInstanceId ?? null,
+            groupProtocol: options.groupProtocol ?? 'classic',
             rackId: options.rackId ?? '',
             sessionTimeoutMs: options.sessionTimeoutMs ?? 30_000,
             rebalanceTimeoutMs: options.rebalanceTimeoutMs ?? 60_000,
@@ -103,8 +115,9 @@ export class Consumer extends EventEmitter<{
             metadata: this.metadata,
             isolationLevel: this.options.isolationLevel,
         });
+        const Group = this.options.groupProtocol === 'consumer' ? ConsumerProtocolGroup : ConsumerGroup;
         this.consumerGroup = this.options.groupId
-            ? new ConsumerGroup({
+            ? new Group({
                   cluster: this.cluster,
                   topics: this.options.topics,
                   groupId: this.options.groupId,
@@ -136,9 +149,12 @@ export class Consumer extends EventEmitter<{
             try {
                 await this.cluster.connect();
                 await this.fetchMetadata();
-                this.metadata.setAssignment(this.metadata.getTopicPartitions());
-                await this.fetchOffsets();
-                await this.consumerGroup?.init();
+                if (this.consumerGroup) {
+                    await this.consumerGroup.init();
+                } else {
+                    this.metadata.setAssignment(this.metadata.getTopicPartitions());
+                    await this.fetchOffsets();
+                }
                 break;
             } catch (error) {
                 log.error('Failed to start consumer', error);
@@ -214,6 +230,7 @@ export class Consumer extends EventEmitter<{
                 if (!joined) {
                     await this.committing;
                     await this.consumerGroup?.join();
+                    await this.fetchOffsets(this.offsetManager.getPartitionsWithoutOffset());
                     joined = true;
                 }
                 if (this.stopRequested) break;
@@ -234,6 +251,7 @@ export class Consumer extends EventEmitter<{
                     }),
                 );
 
+                this.fetchSessions = {};
                 this.fetchManager = new FetchManager({
                     fetch: this.fetch.bind(this),
                     process: this.process.bind(this),
@@ -413,16 +431,21 @@ export class Consumer extends EventEmitter<{
 
     private async fetch(nodeId: number, assignment: Assignment, previous?: FetchResponse): Promise<FetchResponse> {
         const { rackId, maxWaitMs, minBytes, maxBytes, partitionMaxBytes, isolationLevel } = this.options;
+        const session = (this.fetchSessions[nodeId] ??= new FetchSession());
         let nextOffsets = previous ? this.getNextOffsets(previous) : {};
 
         this.consumerGroup?.handleLastHeartbeat();
 
         const handleError = async (error: unknown) => {
+            session.reset();
             if (
                 error instanceof ConnectionError ||
                 (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.NOT_LEADER_OR_FOLLOWER)
             ) {
                 throw new StaleMetadataError(getErrorMessage(error));
+            }
+            if (error instanceof KafkaTSApiError && FETCH_SESSION_ERROR_CODES.includes(error.errorCode)) {
+                return;
             }
             if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.OFFSET_OUT_OF_RANGE) {
                 log.warn('Offset out of range. Resetting offsets.');
@@ -433,31 +456,44 @@ export class Consumer extends EventEmitter<{
             nextOffsets = {};
         };
 
-        return withRetry(handleError)(() =>
-            this.cluster.sendRequestToNode(nodeId)(API.FETCH, {
+        return withRetry(handleError)(async () => {
+            const offsets = Object.entries(assignment).flatMap(([topic, partitions]) =>
+                partitions.map((partition) => ({
+                    topic,
+                    partition,
+                    offset: nextOffsets[topic]?.[partition] ?? this.offsetManager.getPosition(topic, partition),
+                })),
+            );
+            const request = session.createRequest(offsets);
+            const topics = [...new Set(request.offsets.map(({ topic }) => topic))];
+
+            const response = await this.cluster.sendRequestToNode(nodeId)(API.FETCH, {
                 maxWaitMs,
                 minBytes,
                 maxBytes,
                 isolationLevel,
-                sessionId: 0,
-                sessionEpoch: -1,
-                topics: Object.entries(assignment).map(([topicName, partitions]) => ({
+                sessionId: request.sessionId,
+                sessionEpoch: request.sessionEpoch,
+                topics: topics.map((topicName) => ({
                     topicId: this.metadata.getTopicIdByName(topicName),
                     topicName,
-                    partitions: partitions.map((partition) => ({
-                        partition,
-                        currentLeaderEpoch: -1,
-                        fetchOffset:
-                            nextOffsets[topicName]?.[partition] ?? this.offsetManager.getPosition(topicName, partition),
-                        lastFetchedEpoch: -1,
-                        logStartOffset: -1n,
-                        partitionMaxBytes,
-                    })),
+                    partitions: request.offsets
+                        .filter(({ topic }) => topic === topicName)
+                        .map(({ partition, offset }) => ({
+                            partition,
+                            currentLeaderEpoch: -1,
+                            fetchOffset: offset,
+                            lastFetchedEpoch: -1,
+                            logStartOffset: -1n,
+                            partitionMaxBytes,
+                        })),
                 })),
                 forgottenTopicsData: [],
                 rackId,
-            }),
-        );
+            });
+            session.update(response.sessionId, offsets);
+            return response;
+        });
     }
 
     private async fetchMetadata() {

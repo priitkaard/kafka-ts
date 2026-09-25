@@ -1,12 +1,23 @@
 import { randomBytes } from 'crypto';
 import { readFileSync } from 'fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { API } from './api';
+import { API, API_ERROR, handleApiError } from './api';
 import { KEY_TYPE } from './api/find-coordinator';
 import { saslPlain } from './auth';
 import { createKafkaClient } from './client';
 import { Cluster } from './cluster';
+import { SendRequest } from './connection';
+import { delay } from './utils/delay';
 import { KafkaTSApiError } from './utils/error';
+import { withRetry } from './utils/retry';
+
+const retryWhileStarting = withRetry(handleApiError, 100);
+
+const COORDINATOR_ERROR_CODES: number[] = [
+    API_ERROR.NOT_COORDINATOR,
+    API_ERROR.COORDINATOR_NOT_AVAILABLE,
+    API_ERROR.COORDINATOR_LOAD_IN_PROGRESS,
+];
 
 const kafka = createKafkaClient({
     clientId: 'kafka-ts',
@@ -80,9 +91,10 @@ describe.sequential('Low-level API', () => {
             includeTopicAuthorizedOperations: false,
         });
         result.controllerId = 0;
-        result.topics = result.topics.filter((topic) => topic.name !== '__consumer_offsets');
+        result.topics = result.topics.filter((topic) => topic.name === topicName);
         result.topics.forEach((topic) => {
             topic.topicId = 'Any<UUID>';
+            topic.partitions.sort((a, b) => a.partitionIndex - b.partitionIndex);
             topic.partitions.forEach((partition) => {
                 partition.leaderId = 0;
                 partition.isrNodes = [0];
@@ -92,7 +104,7 @@ describe.sequential('Low-level API', () => {
         expect(result).toMatchSnapshot();
     });
 
-    let partitionIndex = 0;
+    const partitionIndex = 0;
     let leaderId = 0;
 
     it('should request metadata for a topic', async () => {
@@ -101,11 +113,13 @@ describe.sequential('Low-level API', () => {
             allowTopicAutoCreation: false,
             includeTopicAuthorizedOperations: false,
         });
-        partitionIndex = result.topics[0].partitions[0].partitionIndex;
-        leaderId = result.topics[0].partitions[0].leaderId;
+        leaderId = result.topics[0].partitions.find(
+            (partition) => partition.partitionIndex === partitionIndex,
+        )!.leaderId;
         result.controllerId = 0;
         result.topics.forEach((topic) => {
             topic.topicId = 'Any<UUID>';
+            topic.partitions.sort((a, b) => a.partitionIndex - b.partitionIndex);
             topic.partitions.forEach((partition) => {
                 partition.leaderId = 0;
                 partition.isrNodes = [0];
@@ -118,12 +132,14 @@ describe.sequential('Low-level API', () => {
     let producerId = 9n;
 
     it('should init producer id', async () => {
-        const result = await cluster.sendRequest(API.INIT_PRODUCER_ID, {
-            transactionalId: null,
-            transactionTimeoutMs: 0,
-            producerId,
-            producerEpoch: 0,
-        });
+        const result = await retryWhileStarting(() =>
+            cluster.sendRequest(API.INIT_PRODUCER_ID, {
+                transactionalId: null,
+                transactionTimeoutMs: 0,
+                producerId,
+                producerEpoch: 0,
+            }),
+        );
         result.producerId = 0n;
         expect(result).toMatchSnapshot();
     });
@@ -133,7 +149,7 @@ describe.sequential('Low-level API', () => {
         const result = await cluster.sendRequestToNode(leaderId)(API.PRODUCE, {
             transactionalId: null,
             timeoutMs: 10000,
-            acks: 1,
+            acks: -1,
             topicData: [
                 {
                     name: topicName,
@@ -219,8 +235,22 @@ describe.sequential('Low-level API', () => {
 
     let coordinatorId = -1;
 
+    const findCoordinator = () =>
+        retryWhileStarting(() =>
+            cluster.sendRequest(API.FIND_COORDINATOR, { keyType: KEY_TYPE.GROUP, keys: [groupId] }),
+        );
+
+    const retryOnCoordinatorChange = withRetry(async (error) => {
+        if (!(error instanceof KafkaTSApiError && COORDINATOR_ERROR_CODES.includes(error.errorCode))) throw error;
+        await delay(100);
+        coordinatorId = (await findCoordinator()).coordinators[0].nodeId;
+    }, 100);
+
+    const sendToCoordinator: SendRequest = (api, body) =>
+        retryOnCoordinatorChange(() => cluster.sendRequestToNode(coordinatorId)(api, body));
+
     it('should find coordinator', async () => {
-        const result = await cluster.sendRequest(API.FIND_COORDINATOR, { keyType: KEY_TYPE.GROUP, keys: [groupId] });
+        const result = await findCoordinator();
         result.coordinators.forEach((coordinator) => {
             coordinator.key = 'Any<String>';
         });
@@ -236,7 +266,7 @@ describe.sequential('Low-level API', () => {
 
     it('should fail join group request with new memberId', async () => {
         try {
-            const result = await cluster.sendRequestToNode(coordinatorId)(API.JOIN_GROUP, {
+            const result = await sendToCoordinator(API.JOIN_GROUP, {
                 groupId,
                 sessionTimeoutMs: 30000,
                 rebalanceTimeoutMs: 60000,
@@ -261,7 +291,7 @@ describe.sequential('Low-level API', () => {
     });
 
     it('should join group', async () => {
-        const result = await cluster.sendRequestToNode(coordinatorId)(API.JOIN_GROUP, {
+        const result = await sendToCoordinator(API.JOIN_GROUP, {
             groupId,
             sessionTimeoutMs: 30000,
             rebalanceTimeoutMs: 60000,
@@ -285,7 +315,7 @@ describe.sequential('Low-level API', () => {
     });
 
     it('should sync group', async () => {
-        const result = await cluster.sendRequestToNode(coordinatorId)(API.SYNC_GROUP, {
+        const result = await sendToCoordinator(API.SYNC_GROUP, {
             groupId,
             generationId: 1,
             memberId,
@@ -303,7 +333,7 @@ describe.sequential('Low-level API', () => {
     });
 
     it('should commit offsets', async () => {
-        const result = await cluster.sendRequestToNode(coordinatorId)(API.OFFSET_COMMIT, {
+        const result = await sendToCoordinator(API.OFFSET_COMMIT, {
             groupId,
             generationIdOrMemberEpoch: 1,
             memberId,
@@ -322,7 +352,7 @@ describe.sequential('Low-level API', () => {
     });
 
     it('should fetch offsets', async () => {
-        const result = await cluster.sendRequestToNode(coordinatorId)(API.OFFSET_FETCH, {
+        const result = await sendToCoordinator(API.OFFSET_FETCH, {
             groups: [
                 {
                     groupId,
@@ -344,7 +374,7 @@ describe.sequential('Low-level API', () => {
     });
 
     it('should heartbeat', async () => {
-        const result = await cluster.sendRequestToNode(coordinatorId)(API.HEARTBEAT, {
+        const result = await sendToCoordinator(API.HEARTBEAT, {
             groupId,
             generationId: 1,
             memberId,
@@ -354,7 +384,7 @@ describe.sequential('Low-level API', () => {
     });
 
     it('should leave group', async () => {
-        const result = await cluster.sendRequestToNode(coordinatorId)(API.LEAVE_GROUP, {
+        const result = await sendToCoordinator(API.LEAVE_GROUP, {
             groupId,
             members: [{ memberId, groupInstanceId: null, reason: null }],
         });

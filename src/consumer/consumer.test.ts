@@ -172,7 +172,11 @@ describe('Consumer', () => {
             getTopicPartitionLeaderIds: () => ({ topic: { 0: 1 } }),
             getTopicIdByName: () => '',
         };
-        (consumer as any).offsetManager = { getPosition: () => 0n };
+        (consumer as any).offsetManager = {
+            getPosition: () => 0n,
+            getPartitionsWithoutOffset: () => ({}),
+            fetchOffsets: async () => {},
+        };
         (consumer as any).fetchMetadata = fetchMetadata;
 
         await (consumer as any).runFetchManager();

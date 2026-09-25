@@ -166,6 +166,19 @@ describe('Cluster recovery', () => {
         await cluster.disconnect();
     });
 
+    it('keeps the seed connection when switching to the same broker', async () => {
+        broker = new FakeBroker();
+        await broker.start();
+
+        const cluster = createCluster(broker.port);
+        await cluster.connect();
+        await cluster.setSeedBroker(1);
+        await cluster.setSeedBroker(1);
+
+        expect(broker.openSockets.size).toBe(1);
+        await cluster.disconnect();
+    });
+
     it('does not keep a broker connection acquired while disconnecting', async () => {
         broker = new FakeBroker();
         await broker.start();

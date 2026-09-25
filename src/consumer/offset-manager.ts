@@ -56,6 +56,15 @@ export class OffsetManager {
         });
     }
 
+    public getPartitionsWithoutOffset(): Assignment {
+        return Object.fromEntries(
+            Object.entries(this.options.metadata.getAssignment()).map(([topic, partitions]) => [
+                topic,
+                partitions.filter((partition) => this.currentOffsets[topic]?.[partition] === undefined),
+            ]),
+        );
+    }
+
     public isResolved(message: { topic: string; partition: number; offset: bigint }) {
         return (
             this.getCurrentOffset(message.topic, message.partition) > message.offset ||

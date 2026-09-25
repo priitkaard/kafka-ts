@@ -22,13 +22,14 @@ type ClusterOptions = {
 
 export class Cluster {
     private seedBroker: Broker | undefined;
+    private seedNodeId: number | undefined;
     private brokerById: Record<number, Broker> = {};
     private brokerMetadata: Record<number, Metadata['brokers'][number]> = {};
 
     constructor(private options: ClusterOptions) {}
 
     public async connect() {
-        const seedBroker = await this.findSeedBroker();
+        const { broker: seedBroker, address } = await this.findSeedBroker();
 
         const staleBrokers = [this.seedBroker, ...Object.values(this.brokerById)];
         this.seedBroker = seedBroker;
@@ -37,6 +38,9 @@ export class Cluster {
 
         try {
             await this.refreshBrokerMetadata();
+            this.seedNodeId = Object.values(this.brokerMetadata).find(
+                ({ host, port }) => host === address.host && port === address.port,
+            )?.nodeId;
         } catch (error) {
             this.seedBroker = undefined;
             await this.safeDisconnect(seedBroker);
@@ -48,6 +52,7 @@ export class Cluster {
         const brokers = [this.seedBroker, ...Object.values(this.brokerById)];
 
         this.seedBroker = undefined;
+        this.seedNodeId = undefined;
         this.brokerById = {};
         this.brokerMetadata = {};
 
@@ -87,9 +92,12 @@ export class Cluster {
     });
 
     public setSeedBroker = async (nodeId: number) => {
+        if (this.seedBroker && this.seedNodeId === nodeId) return;
+
         const broker = await this.acquireBroker(nodeId);
         const staleBroker = this.seedBroker;
         this.seedBroker = broker;
+        this.seedNodeId = nodeId;
         await this.safeDisconnect(staleBroker);
     };
 
@@ -165,7 +173,7 @@ export class Cluster {
                     options,
                 });
                 await broker.connect();
-                return broker;
+                return { broker, address: options };
             } catch (error) {
                 log.warn(`Failed to connect to seed broker ${options.host}:${options.port}`, {
                     reason: (error as Error).message,

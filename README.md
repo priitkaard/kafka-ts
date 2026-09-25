@@ -180,9 +180,10 @@ Custom SASL mechanisms can be implemented following the `SASLProvider` interface
 | topics                 | string[]                               | true     |                                 | List of topics to subscribe to                                                       |
 | groupId                | string                                 | false    | _null_                          | Consumer group id                                                                    |
 | groupInstanceId        | string                                 | false    | _null_                          | Static group member id (see [Static membership](#static-membership))                 |
+| groupProtocol          | 'classic' \| 'consumer'                | false    | 'classic'                       | Group protocol. `'consumer'` uses the incremental rebalance protocol (Kafka 4.0+)    |
 | rackId                 | string                                 | false    | _null_                          | Rack id                                                                              |
 | isolationLevel         | IsolationLevel                         | false    | IsolationLevel.READ_UNCOMMITTED | Isolation level                                                                      |
-| sessionTimeoutMs       | number                                 | false    | 30000                           | Session timeout in milliseconds                                                      |
+| sessionTimeoutMs       | number                                 | false    | 30000                           | Session timeout in milliseconds (classic protocol only)                              |
 | rebalanceTimeoutMs     | number                                 | false    | 60000                           | Rebalance timeout in milliseconds                                                    |
 | maxWaitMs              | number                                 | false    | 5000                            | Fetch long poll timeout in milliseconds. Must be lower than `requestTimeout`.        |
 | minBytes               | number                                 | false    | 1                               | Minimum number of bytes to wait for before returning a fetch response                |
