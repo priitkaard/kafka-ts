@@ -190,15 +190,15 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
 
     private async runFetchManager() {
         const { groupId } = this.options;
-        let rejoin = true;
+        let joined = false;
 
         while (!this.stopRequested) {
             try {
-                if (rejoin) {
+                if (!joined) {
                     await this.committing;
                     await this.consumerGroup?.join();
+                    joined = true;
                 }
-                rejoin = true;
                 if (this.stopRequested) break;
 
                 // TODO: If leader is not available, find another read replica
@@ -227,6 +227,7 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                 if (!nodeAssignments.length) {
                     await this.waitForReassignment();
                 }
+                joined = false;
             } catch (error) {
                 await this.fetchManager?.stop();
 
@@ -234,11 +235,11 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                     log.debug(`${error.message}. Refreshing metadata...`);
                     await delay(100);
                     await this.fetchMetadata();
-                    rejoin = false;
                     continue;
                 }
                 if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.REBALANCE_IN_PROGRESS) {
                     log.debug('Rebalance in progress...', { apiName: error.apiName, groupId });
+                    joined = false;
                     continue;
                 }
                 if (error instanceof KafkaTSApiError && error.errorCode === API_ERROR.FENCED_INSTANCE_ID) {
@@ -252,9 +253,10 @@ export class Consumer extends EventEmitter<{ offsetCommit: []; heartbeat: []; re
                     continue;
                 }
                 if (error instanceof ConnectionError) {
-                    log.debug(`${error.message}. Restarting consumer...`, { stack: error.stack });
-                    void this.restart();
-                    break;
+                    log.debug(`${error.message}. Reconnecting to coordinator...`, { stack: error.stack });
+                    await this.cluster.ensureConnected();
+                    await this.consumerGroup?.findCoordinator();
+                    continue;
                 }
                 log.error((error as Error).message, error);
 

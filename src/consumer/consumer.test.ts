@@ -211,6 +211,47 @@ describe('Consumer', () => {
         expect(fetchOffsets).toHaveBeenCalledExactlyOnceWith({ topic: [1] });
     });
 
+    it('rejoins without leaving the group when the coordinator connection fails', async () => {
+        const cluster = createCluster();
+        cluster.ensureConnected = vi.fn(async () => {});
+        const consumer = new Consumer(cluster, { topics: ['topic'], groupId: 'group', onBatch: () => {} });
+        const join = vi.fn(async () => {
+            if (join.mock.calls.length === 1) throw new ConnectionError('Socket closed unexpectedly');
+            (consumer as any).stopRequested = true;
+        });
+        const findCoordinator = vi.fn(async () => {});
+        const leaveGroup = vi.fn(async () => {});
+
+        (consumer as any).consumerGroup = { join, findCoordinator, leaveGroup };
+
+        await (consumer as any).runFetchManager();
+
+        expect(cluster.ensureConnected).toHaveBeenCalledOnce();
+        expect(findCoordinator).toHaveBeenCalledOnce();
+        expect(join).toHaveBeenCalledTimes(2);
+        expect(leaveGroup).not.toHaveBeenCalled();
+    });
+
+    it('keeps its membership when the coordinator connection fails after joining', async () => {
+        const cluster = createCluster();
+        cluster.ensureConnected = vi.fn(async () => {});
+        const consumer = new Consumer(cluster, { topics: ['topic'], groupId: 'group', onBatch: () => {} });
+        const handleLastHeartbeat = vi.fn(() => {
+            if (handleLastHeartbeat.mock.calls.length === 1) throw new ConnectionError('Socket closed unexpectedly');
+            (consumer as any).stopRequested = true;
+        });
+        const join = vi.fn(async () => {});
+        const findCoordinator = vi.fn(async () => {});
+
+        (consumer as any).consumerGroup = { join, findCoordinator, handleLastHeartbeat };
+        (consumer as any).metadata = { getAssignment: () => ({}), getTopicPartitionLeaderIds: () => ({}) };
+
+        await (consumer as any).runFetchManager();
+
+        expect(findCoordinator).toHaveBeenCalledOnce();
+        expect(join).toHaveBeenCalledOnce();
+    });
+
     it('closes when the group reports the instance id was fenced', async () => {
         const consumer = new Consumer(createCluster(), { topics: ['topic'], groupId: 'group', onBatch: () => {} });
 
